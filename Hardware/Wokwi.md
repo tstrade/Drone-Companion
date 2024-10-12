@@ -15,4 +15,3 @@ Missing Items:
 4. LiPO Battery (Ideally 45-60 min. flight time)
 5. Medium breadboard
 
-** Still need verification from the team if this is a view-only link or if editing access is granted (tstrade)
