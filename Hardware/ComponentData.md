@@ -176,14 +176,14 @@ Start up
 | Chip Built-in | 16 bit A/D converter, 16 bit data output |
 | Gyroscopic Range | $\pm$ 250, 500, 1000, 2000 degrees/sec |
 | Gyroscope Operating Current | 3.6 mA |
-| Gyroscope Standby Current | 5 $\mu$A |
+| Gyroscope Standby Current | 5 $\micro$A |
 | Gyroscope Start up Time | 30 ms |
 | Acceleration Range | $\pm$ 2, 4, 8, 16g |
 | Accelerometer Operating Current | 500 $\mu$A |
-| Accelerometer Low Power Current at 1.25 Hz | 10 $\mu$A |
-| Accelerometer Low Power Current at 5 Hz | 20 $\mu$A |
-| Accelerometer Low Power Current at 20 Hz | 60 $\mu$A |
-| Accelerometer Low Power Current at 40 Hz | 110 $\mu$A |
+| Accelerometer Low Power Current at 1.25 Hz | 10 $\micro$A |
+| Accelerometer Low Power Current at 5 Hz | 20 $\micro$A |
+| Accelerometer Low Power Current at 20 Hz | 60 $\micro$A |
+| Accelerometer Low Power Current at 40 Hz | 110 $\micro$A |
 
 | Gyro/Accel Axes | 3 (X, Y, Z) |
 
