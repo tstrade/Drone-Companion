@@ -92,6 +92,76 @@ In addition to the GitHub examples for library usage, the Adafruit provides a se
 ***
 # **Flight Controllers**
 
+| Specifications | Details Found [Here}(https://www.rcelectricparts.com/40a-esc---classic-series.html) |
+| :----: | :----: |
+| Continuous | 40 A |
+| Bursts | 60 A for 10 seconds |
+| *UBEC | 5V/3A |
+| LiPo Battery | 2 - 4 cells |
+| **NiDc/NiMH | 5 - 12 cells |
+| Dimensions | 71 x 35 x 10.5 mm |
+| Weight | 48 g |
+| Motor Type | Brushless |
+| Max RMP - 2 Pole Motor | 240,000 RPM |
+| Max RMP - 6 Pole Motor | 80,000 RPM |
+| Max RMP - 12 Pole Motor | 40,000 RPM |
+
+*Universal Battery Eliminator Circuit - converts high-voltage power to lower voltages
+**Nickel-cadmium and Nickel-metal hydride are types of rechargeable batteries
+  - NiCd has a short charge time and high discharge rate
+  - NiMH is less toxic and holds more power
+
+## Input/Output Data:
+A complete guide to the GOUPRC 40A Brushless ESC can be found [here](https://www.rcelectricparts.com/classic-esc-user-guide.html).
+
+- Connections
+  - Battery: use pre-soldered XT60 plug
+  - Motor: 3 wires (opposite the XT60 plug)
+      - swap any two connections to reverse motor direction OR
+      - program ESC to spin in reverse direction
+  - Arduino: black ground, red 5V, white signal wires (next to XT60 plug)
+ 
+- Input Signal
+  - PWM Signal Frequency: 50 Hz
+  - Zero Throttle: 1 ms pulse width
+  - Full Throttle: 2 ms pulse width
+  - *Note: PWM signal operates on a spectrum between these endpoints -> allows for incremental control*
+
+*RC Electric Parts provides [this video](https://youtu.be/uOQk8SJso6Q) for Arduino usage*
+ 
+## Procedures:
+Calibration
+  1. Put throttle in maximum position
+  2. Plug in ESC
+  3. Wait until ESC starts beeping
+  4. While beeping, put throttle in minimum position
+  5. Wait for confirmation beeps
+  6. Unplug ESC
+ 
+Start up
+  1. Put throttle in minimum position
+  2. Plug in ESC
+  3. ESC will beep: 1x for each detecting cell + 1x if brake ON OR 2x if brake OFF
+  4. ESC is ready
+
+## Benefits:
+- Smooth, programmable, and accurate linear throttle adjustment
+- Supports high RPM motors
+- Utilizes smaller MOSFETs to minimize weight
+- Minimal heat dissipation
+- Pre-soldered with 3.5 mm Bullet Plugs and an XT60 Plug
+- Reduces electromagnetic interference signal input
+- Beeps during start up to confirm the number of battery cells
+
+## Built-In Safety Features:
+- Start-up Protection: will stop powering motor if it detects motor is unable to spin after start up
+- Safe Start Protection: will not power the motor on start up unless throttle is in minimum throttle position to prevent dangerous accidental start ups
+- Overheat Protection: output power reduces to 40% when over $100^\circ$C ($212^\circ$F)
+- Lost Signal Protection: when signal is lost the ESC cutes the motor's power to prevent a runaway object
+- Low Voltage Protection: if battery voltage drops below programmed threshold, will shut off or reduce throttle depending on programmed settings
+
+*Note: Need to investigate how some of these criteria are met to avoid false-alarms / self-inflicted bugs*
+
 ***
 # **Accelerometer**
 
@@ -100,6 +170,19 @@ In addition to the GitHub examples for library usage, the Adafruit provides a se
 
 ***
 # **Motors**
+
+| Specifications | Details Found [Here](https://speedyfpv.com/products/720-brushed-motor-set-4pcs-7x20mm-coreless-motor-1mm-shaft?variant=44109063946454) |
+| :----: | :----: |
+| Operating Voltage | 3.7-4.2 V |
+| Operating Current | 80-100 mA |
+| Speed | 45,000 RPM |
+| Motor Diameter | 7 mm |
+| Motor Length | 20 mm |
+| Propeller Shaft Diameter | 1 mm |
+| Propeller Shaft Length | 5 mm |
+| Propeller Length | 55 mm |
+| Overall Weight | 3g |
+
 
 ***
 # **Buzzer**
