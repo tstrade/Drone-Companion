@@ -92,7 +92,7 @@ In addition to the GitHub examples for library usage, the Adafruit provides a se
 ***
 # **Flight Controllers**
 
-| Specifications | Details Found [Here}(https://www.rcelectricparts.com/40a-esc---classic-series.html) |
+| Specifications | Details Found [Here](https://www.rcelectricparts.com/40a-esc---classic-series.html) |
 | :----: | :----: |
 | Continuous | 40 A |
 | Bursts | 60 A for 10 seconds |
@@ -163,7 +163,54 @@ Start up
 *Note: Need to investigate how some of these criteria are met to avoid false-alarms / self-inflicted bugs*
 
 ***
-# **Accelerometer**
+# **Accelerometer / Gyroscope**
+
+| Specifications | Details Found [Here](https://www.haoyuelectronics.com/Attachment/GY-521/mpu6050.pdf) |
+| :----: | :----: |
+| Main Chip | MPU-6050 |
+| Power Supply | 3.3-5 V |
+| VDD | 2.375-3.46 V |
+| VLOGIC | $1.71 \pm 5%$ OR VDD |
+| Operaitng Current | 3.9 mA |
+| Communication Mode | I2C Protocol (using Wire Arduino Library) |
+| Chip Built-in | 16 bit A/D converter, 16 bit data output |
+| Gyroscopic Range | $\pm$ 250, 500, 1000, 2000 degrees/sec |
+| Gyroscope Operating Current | 3.6 mA |
+| Gyroscope Standby Current | 5 $\mu$A |
+| Gyroscope Start up Time | 30 ms |
+| Acceleration Range | $\pm$ 2, 4, 8, 16g |
+| Accelerometer Operating Current | 500 $\mu$A |
+| Accelerometer Low Power Current at 1.25 Hz | 10 $\mu$A |
+| Accelerometer Low Power Current at 5 Hz | 20 $\mu$A |
+| Accelerometer Low Power Current at 20 Hz | 60 $\mu$A |
+| Accelerometer Low Power Current at 40 Hz | 110 $\mu$A |
+
+| Gyro/Accel Axes | 3 (X, Y, Z) |
+
+Important Notes:
+- I2C Operating Frequency ranges from 100 to 400 kHz
+- IC2 Address is either `AD0 = 0` ($1101000$) or `AD0 = 1` ($1101001$)
+
+## Pinout Summary:
+- Pin 8: VLOGIC
+- Pin 9: AD0
+- Pin 23: SCL
+- Pin 24: SDA
+
+## Input Data:
+- High Level Input Voltage $V_{IH} = 0.7 \times$ VLOGIC
+- Low Level Input Voltage $V_{IL} = 0.3 \times$ VLOGIC
+- Gyro sensitivity set by `FS_SEL = 0, 1, 2, or 3` (corresponding values defined in table above)
+- Accel sensitivity set by `AFS_SEL = 0, 1, 2, or 3` (corresponding values defined in table above)
+
+## Output Data:
+- High Level Output Voltage $V_{OH} = 0.9 \times$ VLOGIC (assuming a load resistor of $R_L = 1M\Omega$
+- Low Level Output Voltage $V_{OL} = 0.1 \times$ VLOGIC (assuming a load resistor of $R_L = 1M\Omega$
+- Data rate of 8000 Hz (Gyro), 1000 Hz (Accel)
+- 1024 byte FIFO buffer
+  - Reduces power consumption by allowing host processor to read data in bursts and go into low-power mode as sensor collects more data
+- Digital output temperature sensor
+- Possibility for gesture recognition??? (page 11 of manual linked above)
 
 ***
 # **Power Distribution Board**
