@@ -237,3 +237,13 @@ Important Notes:
 ***
 # **IR Transmitter/Receiver**
 
+| Output | active at low level (0.2 V) |
+| Power supply | 4.5 V ~ 5.5 V |
+| Power consumption | 0.6 mA |
+| Wavelength | 940 nm |
+| BPF center frequency | 38 kHz |
+| Operating temperature | -10°C ~ +60°C |
+| Signal range | max. 10 m |
+| Dimensions | 7.3 x 7.6 x 5.2 mm |
+| Weight | 0.68 g |
+
