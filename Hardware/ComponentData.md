@@ -1,5 +1,5 @@
 # **Ultrasonic Sensor**
-## Electric Parameters
+## Electric Parameters:
 
 | Working Voltage | DC 5V |
 | :---: | :---: |
@@ -29,7 +29,7 @@
 The timing diagram and all information listed in this section can be found in the Ultrasonic Ranging Module HC-SR04 datasheet included in this repository. Any additional information may be found in the module's [Github Repository](https://github.com/sparkfun/HC-SR04_UltrasonicSensor)
 
 
-## Dimensions
+## Dimensions:
 - 45 x 20 x 15 millimeters
 - 1.8 x 0.8 x 0.6 inches
 
@@ -47,21 +47,63 @@ The timing diagram and all information listed in this section can be found in th
 
 ***
 # **Altitude Sensor**
-## Input Data:
+## Overview
+- Barometric Pressure Accuracy: $\pm 1$ hPa
+- Temperature Accuracy: $\pm 1.0^\circ$C
+- Altimeter Accuracy: $\pm 1$ meter
+- Low Altitude Noise: $0.25$ meters
+- ! Can be used with 3.3V or 5V systems thanks to built-in voltage regulator
 
+## Pinouts:
+| Pins | Use |
+| :---: | :---: |
+| Vin | Power pin - use same power as logic level of microcontroller |
+| 3Vo | 3.3V output from voltage regulator - can grab up to 100mA |
+| GND | Common ground for power and logic |
+| --------- | --------------------------------------------------------------------------------- |
+| ***SPI*** | ***PROTOCOL PINS*** |
+| SCK | SPI Clock Pin - input to chip |
+| SDO | Serial Data Out / Microcontoller In Sensor Out pin - data sent from sensor to processor |
+| SDI | Serial Data In / Microcontroller Out Sensor In pin - data sent from processor to sensor |
+| CS | Chip Slect pin - drop to low to start SPI transaction; input to chip |
+| --------- | --------------------------------------------------------------------------------- |
+| ***I2C*** | ***PROTOCOL PINS*** |
+| SCK (SCL) | I2C Clock Pin - connect to microcontroller's I2C clock line |
+| SDI (SDA) | I2C Data Pin - connect to microcontroller's I2C data line |
+| SDO | Leave unconnected |
+| CS | Leave unconnected |
 
-## Output Data:
+[BMP280 to Arduino Wiring-by-Protocol](https://learn.adafruit.com/adafruit-bmp280-barometric-pressure-plus-temperature-sensor-breakout/arduino-test)
 
+## Input/Output Data:
+
+Adafruit provides a library for the BMP280 that is available from the Arduino library manager, and can be installed from GitHub [here](https://github.com/adafruit/Adafruit_BMP280_Library/tree/master).
+
+Additionally, the GitHub repository includes a few examples on how to interact with the BMP280 through an Arduino sketch. It is encouraged to review this documentation, but the examples can be summarized as follows: initialize sensor, call for a temperature and/or pressure reading using `getEvent()`, and store or print the value obtained by the sensor. 
+
+What to look into during the coding subphase: 
+- Different operating modes
+- Oversampling values
+- Standby timing
+- Proper addressing for chosen protocol
+
+In addition to the GitHub examples for library usage, the Adafruit provides a section on [how to use the library with the SPI protocol](https://learn.adafruit.com/adafruit-bmp280-barometric-pressure-plus-temperature-sensor-breakout/arduino-test). 
 
 ***
-# **Flight Controller**
-## Input Data:
+# **Flight Controllers**
 
+***
+# **Accelerometer**
 
-## Output Data:
+***
+# **Power Distribution Board**
 
+***
+# **Motors**
 
 ***
 # **Buzzer**
-## Input Data:
+
+***
+# **IR Transmitter/Receiver**
 
