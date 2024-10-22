@@ -12,5 +12,6 @@ how the software will communicate I/O data between different combinations of com
   
 ***
 ### Paired Component Tests
+- [Radar Sensors, Accelerometer, Altitude Sensor, Buzzer](https://wokwi.com/projects/412369553864428545)
 
 ***
