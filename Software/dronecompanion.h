@@ -54,13 +54,24 @@ long distance[2];
 Servo hc1, hc2;
 
 // Buzzer Notes
-const int alarm[] = { NOTE_B4, 
-                      NOTE_F4, 
-                      NOTE_B4, 
+const int alarm[] = { NOTE_B4,
+                      NOTE_F4,
+                      NOTE_B4,
                       NOTE_F4,
                       NOTE_B4,
                       NOTE_F4};
 
+// Function Declarations
+int init_takeoff();
 
+void init_landing();
+
+int calculate_distance(int trig, int echo, int radar_idx);
+
+void process_radar();
+
+void react_to_obstacle(int distance);
+
+void react_to_user(int distance);
 
 #endif
