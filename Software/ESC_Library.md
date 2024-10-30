@@ -2,7 +2,7 @@
 - ESC waits for a low PWM signal to arm itself
 - Min and Max PWM values can be calibrated
 - Object - ESC name (PIN#, MIN, MAX, ARMING VALUE)
-	ex.) `ESC myESC (9, 1000, 2000, 500);`
+	- ex.) `ESC myESC (9, 1000, 2000, 500);`
 
 ## Functions:
 - `calib()`: Initiate the calibration process
