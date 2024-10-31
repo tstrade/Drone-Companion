@@ -1,52 +1,49 @@
-#include <Adafruit_MPU6050.h>
-#include <Adafruit_Sensor.h>
+#include <MPU6050.h>
 #include <Wire.h>
-#include <stdlib.h>
 
-Adafruit_MPU6050 mpu;
-sensors_event_t a, g, temp;
+MPU6050 mpu;
 
-#define X_ACCEL_MAX 3
-#define Y_ACCEL_MAX 0
-#define Z_ACCEL_MAX 9.81
-#define GYRO_LIMIT 0
+// Timers
+unsigned long timer = 0;
+float timeStep = 0.01;
+
+// Pitch, Roll and Yaw values
+float pitch = 0;
+float roll = 0;
+float yaw = 0;
 
 void setup() {
   Serial.begin(115200);
 
-  if (!mpu.begin()) {
-    Serial.println("Failed to find MPU6050 chip");
-    while (1) {
-      delay(10);
-    }
+  Serial.println("Initialize MPU6050");
+  while (!mpu.begin(MPU6050_SCALE_2000DPS, MPU6050_RANGE_2G)) {
+    Serial.println("Failed to find MPU6050 chip, checking wiring!");
+    delay(500);
   }
 
-  mpu.setAccelerometerRange(MPU6050_RANGE_16_G);
-  mpu.setGyroRange(MPU6050_RANGE_250_DEG);
-  mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
-  Serial.println("");
-  delay(100);
+  mpu.calibrateGyro();
+  mpu.setThreshold(3);
 }
 
 void loop() {
-  /* Get new sensor events with the readings */
-  sensors_event_t a, g, temp;
-  mpu.getEvent(&a, &g, &temp);
+  timer = millis();
 
-  /* Print out the values */
-  Serial.print("\n\nA: ");
-  Serial.print(a.acceleration.x);
-  Serial.print(",");
-  Serial.print(a.acceleration.y);
-  Serial.print(",");
-  Serial.print(a.acceleration.z);
+  // Read normalized values
+  Vector norm = mpu.readNormalizeGyro();
 
-  Serial.print("\nG: ");
-  Serial.print(g.gyro.x);
-  Serial.print(",");
-  Serial.print(g.gyro.y);
-  Serial.print(",");
-  Serial.print(g.gyro.z);
+  // Calculate Pitch, Roll and Yaw
+  pitch = pitch + norm.YAxis * timeStep;
+  roll = roll + norm.XAxis * timeStep;
+  yaw = yaw + norm.ZAxis * timeStep;
 
-  delay(500);
+  // Output raw
+  Serial.print(" Pitch = ");
+  Serial.print(pitch);
+  Serial.print(" Roll = ");
+  Serial.print(roll);  
+  Serial.print(" Yaw = ");
+  Serial.println(yaw);
+
+  // Wait to full timeStep period
+  delay((timeStep*1000) - (millis() - timer));
 }
