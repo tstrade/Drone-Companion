@@ -22,13 +22,22 @@ void setESCSpeed(int speed) {
 
 void armESC() {
     // Set high throttle
-    setESCSpeed(2000);
+    ESC1.write(2000);
+    ESC2.write(2000);
+    ESC3.write(2000);
+    ESC4.write(2000);
     delay(8000);
     // Set low throttle
-    setESCSpeed(1000);
+    ESC1.write(1000);
+    ESC2.write(1000);
+    ESC3.write(1000);
+    ESC4.write(1000);
     delay(3000);   
     // Arm ESCs
-    setESCSpeed(500);
+    ESC1.write(500);
+    ESC2.write(500);
+    ESC3.write(500);
+    ESC4.write(500);
 
 void setup() {
     // Attach the ESC on pin 9
