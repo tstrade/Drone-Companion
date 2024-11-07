@@ -8,6 +8,22 @@ int analog;
 int potValue;
 int active;
 
+void armESC() {
+    ESC1.write(2000);        // start off setting max throttle
+    ESC2.write(2000);
+    ESC3.write(2000);
+    ESC4.write(2000);
+    delay(8000);            // give the ESC time to see it and make note
+    ESC1.write(1000);       // go to low-throttle
+    ESC2.write(1000);
+    ESC3.write(1000);
+    ESC4.write(1000);
+    delay(3000);            // this might need to be adjusted up/down not sure
+    ESC1.write (500);        // turn totally off
+    ESC2.write (500);
+    ESC3.write (500);
+    ESC4.write (500);
+}
 
 void setESCSpeed(int speed) {
     ESC1.write(speed);
@@ -22,7 +38,7 @@ void setup() {
   ESC2.attach(3);
   ESC3.attach(6);
   ESC4.attach(5);
-  setESCSpeed(500);
+  armESC();
   active = 1;
   delay(1000);
 }
