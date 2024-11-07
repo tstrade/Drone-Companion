@@ -1,5 +1,10 @@
 #include <Servo.h>
 
+#define ESC1_PIN 9
+#define ESC2_PIN 3
+#define ESC3_PIN 6
+#define ESC4_PIN 5
+
 Servo ESC1;   
 Servo ESC2;
 Servo ESC3;
@@ -8,23 +13,6 @@ int analog;
 int potValue;
 int active;
 
-void armESC() {
-    ESC1.write(2000);        // start off setting max throttle
-    ESC2.write(2000);
-    ESC3.write(2000);
-    ESC4.write(2000);
-    delay(8000);            // give the ESC time to see it and make note
-    ESC1.write(1000);       // go to low-throttle
-    ESC2.write(1000);
-    ESC3.write(1000);
-    ESC4.write(1000);
-    delay(3000);            // this might need to be adjusted up/down not sure
-    ESC1.write (500);        // turn totally off
-    ESC2.write (500);
-    ESC3.write (500);
-    ESC4.write (500);
-}
-
 void setESCSpeed(int speed) {
     ESC1.write(speed);
     ESC2.write(speed);
@@ -32,15 +20,28 @@ void setESCSpeed(int speed) {
     ESC4.write(speed);
 }
 
+void armESC() {
+    // Set high throttle
+    setESCSpeed(2000);
+    delay(8000);
+    // Set low throttle
+    setESCSpeed(1000);
+    delay(3000);   
+    // Arm ESCs
+    setESCSpeed(500);
+
 void setup() {
-  // Attach the ESC on pin 9
-  ESC1.attach(9);
-  ESC2.attach(3);
-  ESC3.attach(6);
-  ESC4.attach(5);
-  armESC();
-  active = 1;
-  delay(1000);
+    // Attach the ESC on pin 9
+    ESC1.attach(ESC1_PIN);
+    // Attach the ESC on pin 3
+    ESC2.attach(ESC2_PIN);
+    // Attach the ESC on pin 6
+    ESC3.attach(ESC3_PIN);
+    // Attach the ESC on pin 5
+    ESC4.attach(ESC4_PIN);
+    armESC();
+    active = 1;
+    delay(1000);
 }
 
 void loop() {
@@ -52,7 +53,7 @@ void loop() {
     }
     setESCSpeed(0);
     active = 0;
-    delay(10000);
+    delay(20000);
   } else {
       ESC1.detach();
       ESC2.detach();
