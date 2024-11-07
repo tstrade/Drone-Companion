@@ -38,9 +38,9 @@ void loop() {
     active = 0;
     delay(10000);
   } else {
-      ESC1.detach(9);
-      ESC2.detach(3);
-      ESC3.detach(6);
-      ESC4.detach(5);
+      ESC1.detach();
+      ESC2.detach();
+      ESC3.detach();
+      ESC4.detach();
   }
 }
