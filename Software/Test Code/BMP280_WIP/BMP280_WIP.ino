@@ -3,30 +3,22 @@
 #include <Adafruit_BMP280.h>
 
 Adafruit_BMP280 bmp(10);
+int ground;
+const float airPressure = 1013.25;
 
 
 void setup() {
   Serial.begin(9600);
-  while (!Serial) {
-    delay(100); // wait for native usb
-  }
-
   bmp.begin();
+  ground = bmp.readAltitude(airPressure);
+  Serial.println(ground);
 }
 
 void loop() {
   // Collect altitude data
-  Serial.print(F("Temperature = "));
-  Serial.print(bmp.readTemperature());
-  Serial.println(" *C");
-
-  Serial.print(F("Pressure = "));
-  Serial.print(bmp.readPressure());
-  Serial.println(" Pa");
-
   Serial.print(F("Approx altitude = "));
-  Serial.print(bmp.readAltitude(1013.25) / 3.281); 
-  Serial.println(" feet");
+  Serial.print(bmp.readAltitude(airPressure) - ground); 
+  Serial.println(" meters");
 
   Serial.println();
   delay(2000);
