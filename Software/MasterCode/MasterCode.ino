@@ -46,10 +46,6 @@ Servo backRadar;
 //define a list of tones the buzzer can produce
 const int gameTones[] = { NOTE_G4, NOTE_A4, NOTE_E4, NOTE_D4};
 
-// Complementary filter constants
-float alpha = 0.98;  // Filter constant (tune as needed)
-float dt = 0.01; // Time step
-
 // Initial motor speed (this will be modified later)
 int minMotorSpeed = 1000;  // Base motor speed (minimum throttle)
 int maxMotorSpeed = 2000;  // Maximum throttle for motors
@@ -58,7 +54,8 @@ float altitudeThreshold = 5.0;
 
 const float stdAirPressure = 1013.25;
 
-const float preferredDistance = 91.44
+const float preferredDistance = 100.0; // Preferred distance in cm
+const float distanceTolerance = 10.0; // Tolerance of +/- 10cm
 
 void armESC() {
     // Set high throttle
@@ -79,16 +76,6 @@ void armESC() {
     motorFrontLeft.write(500);
     motorBackLeft.write(500);
     motorFrontRight.write(500);
-}
-
-//calculate distance from duration readings of the radar sensors
-int calculateDistance(int trigPin, int echoPin){
-  digitalWrite(trigPin, LOW);
-  delayMicroseconds(2);
-  digitalWrite(trigPin, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(trigPin, LOW);
-  return (pulseIn(echoPin, HIGH) * 0.034/2);
 }
 
 void setup() {
@@ -134,28 +121,52 @@ void setup() {
   delay(2000);
 }
 
-//follow function not including functionality with the front: just follows user
+//calculate distance from duration readings of the radar sensors
+int calculateDistance(int trigPin, int echoPin){
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+  return (pulseIn(echoPin, HIGH) * 0.034/2);
+}
+
+// Follow user function with the back radar
 void follow(float motorSpeed){
   float userDistance = calculateDistance(trigBack, echoBack);
-  float distanceDifference
+  float distanceDifference;
+  
+  // Move towards user gradually 
   while(userDistance > preferredDistance){
     userDistance = calculateDistance(trigBack, echoBack);
     distanceDifference = userDistance - preferredDistance;
+
     motorSpeed = map(distanceDifference, 0, preferredDistance, minMotorSpeed, maxMotorSpeed);  // Gradually increase speed
     motorSpeed = constrain(motorSpeed, minMotorSpeed, maxMotorSpeed);  // Ensure speed is within bounds
-    moveBackwards(motorspeed)
+
+    moveBackwards(motorSpeed);
+    stabilizeDrone(motorSpeed);
+    delay(20);
   }
+
+  // Move away from user gradually
   while(userDistance < preferredDistance){
     userDistance = calculateDistance(trigBack, echoBack);
     distanceDifference = preferredDistance - userDistance;
+
     motorSpeed = map(distanceDifference, 0, preferredDistance, minMotorSpeed, maxMotorSpeed);  // Gradually increase speed
     motorSpeed = constrain(motorSpeed, minMotorSpeed, maxMotorSpeed);  // Ensure speed is within bounds
-    moveForwards(motorspeed)
+
+    moveForwards(motorSpeed);
+    stabilizeDrone(motorSpeed);
+    delay(20);
   }
   //!!add staalize function!!//
+  stabilizeDrone(minMotorSpeed + 500);
+  delay(100);
 }
 
-void moveForward(updatedSpeed){
+void moveForwards(updatedSpeed){
   motorBackLeft.write(updatedSpeed);
   motorBackRight.write(updatedSpeed);
 }
@@ -165,142 +176,86 @@ void moveBackwards(updatedSpeed){
   motorFrontRight.write(updatedSpeed);
 }
 
+// Stabilize the drone's roll and pitch
+void stabilizeDrone(float motorSpeed) {
+    Vector ACCEL = mpu.readNormalizeAccel();
+    float ax = ACCEL.XAxis, ay = ACCEL.YAxis, az = ACCEL.ZAxis;
+    Vector GYRO = mpu.readNormalizeGyro();
+    float gx = GYRO.XAxis, gy = GYRO.YAxis;
+
+    // Calculate angles
+    float roll = atan2(ay, az) * 180.0 / PI;
+    float pitch = atan2(-ax, sqrt(ay * ay + az * az)) * 180.0 / PI;
+
+    // Proportional control for roll and pitch stabilization
+    float rollCorrection = 0.1 * roll;
+    float pitchCorrection = 0.1 * pitch;
+
+    // Adjust motor speeds for stabilization
+    int speedFrontLeft = motorSpeed + rollCorrection - pitchCorrection;
+    int speedFrontRight = motorSpeed - rollCorrection - pitchCorrection;
+    int speedBackLeft = motorSpeed + rollCorrection + pitchCorrection;
+    int speedBackRight = motorSpeed - rollCorrection + pitchCorrection;
+
+    // Apply speed corrections within bounds
+    motorFrontLeft.writeMicroseconds(constrain(speedFrontLeft, minMotorSpeed, maxMotorSpeed));
+    motorFrontRight.writeMicroseconds(constrain(speedFrontRight, minMotorSpeed, maxMotorSpeed));
+    motorBackLeft.writeMicroseconds(constrain(speedBackLeft, minMotorSpeed, maxMotorSpeed));
+    motorBackRight.writeMicroseconds(constrain(speedBackRight, minMotorSpeed, maxMotorSpeed));
+}
+
+// Hover in place for a set time
+void hoverForTime(unsigned long duration, float motorSpeed) {
+    unsigned long startTime = millis();
+    while (millis() - startTime < duration) {
+        stabilizeDrone(motorSpeed);
+        delay(20);  // Adjust delay as needed for smoother control loop
+    }
+}
+
 // Takeoff sequence: gradually increase motor speeds
 void takeoff(float initialAltitude, float targetAltitude) {
   int motorSpeed = minMotorSpeed;
   float altitude = bmp.readAltitude(stdAirPressure);
-  float altitudeDifference;
 
   while (altitude < initialAltitude + targetAltitude) {
     altitude = bmp.readAltitude(stdAirPressure);  // Read current altitude
-    altitudeDifference = altitude - initialAltitude;
 
-    motorSpeed = map(altitudeDifference, 0, targetAltitude, minMotorSpeed, maxMotorSpeed);  // Gradually increase speed
+    motorSpeed = map(altitude - initialAltitude, 0, targetAltitude, minMotorSpeed, maxMotorSpeed);  // Gradually increase speed
     motorSpeed = constrain(motorSpeed, minMotorSpeed, maxMotorSpeed);  // Ensure speed is within bounds
 
-    // Apply motor speed to ESCs
-    motorFrontLeft.writeMicroseconds(motorSpeed);
-    motorFrontRight.writeMicroseconds(motorSpeed);
-    motorBackLeft.writeMicroseconds(motorSpeed);
-    motorBackRight.writeMicroseconds(motorSpeed);
+    // Apply motor speed and stabilization to ESCs
+    stabilizeDrone(motorSpeed);
     
     delay(50);  // Adjust delay for smoother takeoff
   }
 }
 
-void updateAngles(float ax, float ay, float az, float gx, float gy, float gz, float roll, float pitch, float rollAcc, float pitchAcc) {
-  // Convert gyroscope data to degrees per second
-  gx *= 180.0 / PI;  // Gyroscope x-axis rate in degrees/sec
-  gy *= 180.0 / PI;  // Gyroscope y-axis rate in degrees/sec
-  gz *= 180.0 / PI;  // Gyroscope z-axis rate in degrees/sec
+// Landing sequence: gradually decrease motor speeds
+void land(float initialAltitude) {
+  int motorSpeed = maxMotorSpeed;
+  float altitude;
 
-  // Integrate the gyroscope readings to get roll and pitch
-  roll += gx * dt;  // dt is the time step (e.g., 0.01 seconds)
-  pitch += gy * dt;
-
-  // Apply the complementary filter (weigh accelerometer and gyroscope)
-  roll = alpha * (roll + gx * dt) + (1 - alpha) * rollAcc;
-  pitch = alpha * (pitch + gy * dt) + (1 - alpha) * pitchAcc;
-
-  // Update accelerometer-based angles
-  rollAcc = atan2(ay, az) * 180.0 / PI;
-  pitchAcc = atan2(-ax, sqrt(ay * ay + az * az)) * 180.0 / PI;
-}
-
-// Hover and stabilize the drone
-void stabilize(float initialAltitude, float targetAltitude, float motorSpeed, unsigned long hoverStartTime, float lastAltitude) {
-  // Read normalized accelerometer and gyroscope data
-  Vector ACCEL = mpu.readNormalizeAccel();
-  float ax = ACCEL.XAxis, ay = ACCEL.YAxis, az = ACCEL.ZAxis;
-  Vector GYRO = mpu.readNormalizeGyro();
-  float gx = GYRO.XAxis, gy = GYRO.YAxis, gz = GYRO.ZAxis;
-
-  // Update roll and pitch angles using the complementary filer
-  float roll = 0.0, pitch = 0.0, rollAcc = 0.0, pitchAcc = 0.0;
-  updateAngles(ax, ay, az, gx, gy, gz, roll, pitch, rollAcc, pitchAcc);
-
-  // Simple proportional control for roll and pitch stabilization
-  float rollCorrection = 0.1 * roll;
-  float pitchCorrection = 0.1 * pitch;
-
-  // Map the corrections to adjust motor speeds
-  int speedFrontLeft = motorSpeed + rollCorrection - pitchCorrection;
-  int speedFrontRight = motorSpeed - rollCorrection - pitchCorrection;
-  int speedBackLeft = motorSpeed + rollCorrection + pitchCorrection;
-  int speedBackRight = motorSpeed - rollCorrection + pitchCorrection;
-
-  // Constrain the motor speeds to be within the range of 1000-2000 microseconds
-  speedFrontLeft = constrain(speedFrontLeft, minMotorSpeed, maxMotorSpeed);
-  speedFrontRight = constrain(speedFrontRight, minMotorSpeed, maxMotorSpeed);
-  speedBackLeft = constrain(speedBackLeft, minMotorSpeed, maxMotorSpeed);
-  speedBackRight = constrain(speedBackRight, minMotorSpeed, maxMotorSpeed);
-
-  // Apply motor speed corrections
-  motorFrontLeft.writeMicroseconds(speedFrontLeft);
-  motorFrontRight.writeMicroseconds(speedFrontRight);
-  motorBackLeft.writeMicroseconds(speedBackLeft);
-  motorBackRight.writeMicroseconds(speedBackRight);
-
-  // Check if the drone needs altitude adjustment
-  float altitude = bmp.readAltitude(stdAirPressure);
-  if (abs(altitude - lastAltitude) > altitudeThreshold) {
-    // If the altitude changes significantly, adjust motor speed to stabilize
-    if (altitude < initialAltitude + targetAltitude) {
-      motorSpeed += 5;  // Slowly increase motor speed
-    } else if (altitude > initialAltitude + targetAltitude) {
-      motorSpeed -= 5;  // Slowly decrease motor speed
-    }
-    motorSpeed = constrain(motorSpeed, 1000, maxMotorSpeed);
-  }
-
-  lastAltitude = altitude;
-
-  // Add a small delay for smoother control loop
-  delay(20);  // Adjust delay as needed for your drone's response time
-}
-
-// Graceful landing sequence
-void land(float initialAltitude, float motorSpeed, unsigned long landingStartTime) {
-  // Check if we've been hovering for 15 seconds
-  if (millis() - landingStartTime >= 15000) {
-    // Gradually decrease the motor speed over time (5 seconds)
-    motorSpeed = map(millis() - landingStartTime, 0, 5000, maxMotorSpeed, minMotorSpeed);
-    motorSpeed = constrain(motorSpeed, minMotorSpeed, maxMotorSpeed);
-
-    // Apply motor speed to ESCs
-    motorFrontLeft.writeMicroseconds(motorSpeed);
-    motorFrontRight.writeMicroseconds(motorSpeed);
-    motorBackLeft.writeMicroseconds(motorSpeed);
-    motorBackRight.writeMicroseconds(motorSpeed);
-
-    // Stop the motors once the altitude is near zero
-    if (bmp.readAltitude(stdAirPressure) < 10) {  // If we are very close to the ground
-      motorFrontLeft.writeMicroseconds(minMotorSpeed);
-      motorFrontRight.writeMicroseconds(minMotorSpeed);
-      motorBackLeft.writeMicroseconds(minMotorSpeed);
-      motorBackRight.writeMicroseconds(minMotorSpeed);
-      return;  // Motors stop completely
-    }
+  while (bmp.readAltitude(stdAirPressure) > initialAltitude + 10) {
+    altitude = bmp.readAltitude(stdAirPressure);
+    motorSpeed = constrain(map(altitude - initialAltitude, 0, 50, maxMotorSpeed, minMotorSpeed), minMotorSpeed, maxMotorSpeed);
+       
+    stabilizeDrone(motorSpeed);
+    delay(50);
   }
 }
 
 void loop() {
-  static unsigned long hoverStartTime = 0;
-  static unsigned long landingStartTime = 0;
-  static float initialAltitude = bmp.readAltitude();
-  static float motorSpeed = minMotorSpeed;
-  static float lastAltitude = initialAltitude;
+  static float initialAltitude = bmp.readAltitude(stdAirPressure);
   static float targetAltitude = 100.0;  // Target altitude (in centimeters -> appox. 3 ft.) 
 
-  // Takeoff Sequence
-  if (bmp.readAltitude(stdAirPressure) <= initialAltitude + targetAltitude) {
-    takeoff(initialAltitude, targetAltitude);
-    hoverStartTime = millis();
+  if (receiverIR.decode()) {
+    if (receiverIR.decodedIRData.command == 3) {
+      takeOff(initalAltitude, targetAltitude);
+      hoverForTime(15000, minMotorSpeed + 500);
+    } else if (receiverIR.decodedIRData.command == 4) {
+      land(initalAltitude);
+    }
+    receiverIR.resume();
   }
-
-  // Stabilize and hover for 15 seconds
-  stabilize(initialAltitude, targetAltitude, motorSpeed, hoverStartTime, lastAltitude);
-
-  // Landing Sequence
-  land(initialAltitude, motorSpeed, landingStartTime);
 }
