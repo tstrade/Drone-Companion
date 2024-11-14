@@ -13,10 +13,10 @@
 #define FRONTRIGHT 5
 
 //define radar pins
-#define trigFront 16;
-#define echoFront 17;
-#define trigBack 14;
-#define echoBack 15;
+#define trigFront 16
+#define echoFront 17
+#define trigBack 14
+#define echoBack 15
 
 //define buzzer pin
 #define BUZZER_PIN 8
