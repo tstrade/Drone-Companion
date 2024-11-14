@@ -131,8 +131,18 @@ int calculateDistance(int trigPin, int echoPin){
   return (pulseIn(echoPin, HIGH) * 0.034/2);
 }
 
+void moveForwards(float updatedSpeed) {
+  motorBackLeft.write(updatedSpeed);
+  motorBackRight.write(updatedSpeed);
+}
+
+void moveBackwards(float updatedSpeed) {
+  motorFrontLeft.write(updatedSpeed);
+  motorFrontRight.write(updatedSpeed);
+}
+
 // Follow user function with the back radar
-void follow(float motorSpeed){
+void follow(float motorSpeed) {
   float userDistance = calculateDistance(trigBack, echoBack);
   float distanceDifference;
   
@@ -164,16 +174,6 @@ void follow(float motorSpeed){
   //!!add staalize function!!//
   stabilizeDrone(minMotorSpeed + 500);
   delay(100);
-}
-
-void moveForwards(updatedSpeed){
-  motorBackLeft.write(updatedSpeed);
-  motorBackRight.write(updatedSpeed);
-}
-
-void moveBackwards(updatedSpeed){
-  motorFrontLeft.write(updatedSpeed);
-  motorFrontRight.write(updatedSpeed);
 }
 
 // Stabilize the drone's roll and pitch
@@ -214,7 +214,7 @@ void hoverForTime(unsigned long duration, float motorSpeed) {
 }
 
 // Takeoff sequence: gradually increase motor speeds
-void takeoff(float initialAltitude, float targetAltitude) {
+void takeOff(float initialAltitude, float targetAltitude) {
   int motorSpeed = minMotorSpeed;
   float altitude = bmp.readAltitude(stdAirPressure);
 
@@ -249,13 +249,13 @@ void loop() {
   static float initialAltitude = bmp.readAltitude(stdAirPressure);
   static float targetAltitude = 100.0;  // Target altitude (in centimeters -> appox. 3 ft.) 
 
-  if (receiverIR.decode()) {
-    if (receiverIR.decodedIRData.command == 3) {
-      takeOff(initalAltitude, targetAltitude);
+  if (recieverIR.decode()) {
+    if (recieverIR.decodedIRData.command == 3) {
+      takeOff(initialAltitude, targetAltitude);
       hoverForTime(15000, minMotorSpeed + 500);
-    } else if (receiverIR.decodedIRData.command == 4) {
-      land(initalAltitude);
+    } else if (recieverIR.decodedIRData.command == 4) {
+      land(initialAltitude);
     }
-    receiverIR.resume();
+    recieverIR.resume();
   }
 }
