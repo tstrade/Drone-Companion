@@ -58,6 +58,8 @@ float altitudeThreshold = 5.0;
 
 const float stdAirPressure = 1013.25;
 
+const float preferredDistance = 91.44
+
 void armESC() {
     // Set high throttle
     delay(2000);
@@ -130,6 +132,37 @@ void setup() {
   motorBackRight.writeMicroseconds(minMotorSpeed);
   */
   delay(2000);
+}
+
+//follow function not including functionality with the front: just follows user
+void follow(float motorSpeed){
+  float userDistance = calculateDistance(trigBack, echoBack);
+  float distanceDifference
+  while(userDistance > preferredDistance){
+    userDistance = calculateDistance(trigBack, echoBack);
+    distanceDifference = userDistance - preferredDistance;
+    motorSpeed = map(distanceDifference, 0, preferredDistance, minMotorSpeed, maxMotorSpeed);  // Gradually increase speed
+    motorSpeed = constrain(motorSpeed, minMotorSpeed, maxMotorSpeed);  // Ensure speed is within bounds
+    moveBackwards(motorspeed)
+  }
+  while(userDistance < preferredDistance){
+    userDistance = calculateDistance(trigBack, echoBack);
+    distanceDifference = preferredDistance - userDistance;
+    motorSpeed = map(distanceDifference, 0, preferredDistance, minMotorSpeed, maxMotorSpeed);  // Gradually increase speed
+    motorSpeed = constrain(motorSpeed, minMotorSpeed, maxMotorSpeed);  // Ensure speed is within bounds
+    moveForwards(motorspeed)
+  }
+  //!!add staalize function!!//
+}
+
+void moveForward(updatedSpeed){
+  motorBackLeft.write(updatedSpeed);
+  motorBackRight.write(updatedSpeed);
+}
+
+void moveBackwards(updatedSpeed){
+  motorFrontLeft.write(updatedSpeed);
+  motorFrontRight.write(updatedSpeed);
 }
 
 // Takeoff sequence: gradually increase motor speeds
