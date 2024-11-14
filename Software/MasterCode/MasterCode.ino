@@ -3,12 +3,25 @@
 #include <MPU6050.h>
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BMP280.h> 
+#include <IRremote.h>
+#include <pitches.h>
 
+//define motor pins
 #define BACKRIGHT 9
 #define FRONTLEFT 3
 #define BACKLEFT 6
 #define FRONTRIGHT 5
 
+//define radar pins
+#define trigFront 16;
+#define echoFront 17;
+#define trigBack 14;
+#define echoBack 15;
+
+//define buzzer pin
+#define BUZZER_PIN 8
+
+//define pi
 #define PI 3.14127
 
 // Define the servo motors (ESCs)
@@ -22,6 +35,16 @@ MPU6050 mpu;
 
 // Create an instance of the BMP280 object
 Adafruit_BMP280 bmp(10);
+
+//Initialize IR reciever in an IRrecv object
+IRrecv recieverIR(7);
+
+//define radar sensors using servo object
+Servo frontRadar;
+Servo backRadar;
+
+//define a list of tones the buzzer can produce
+const int gameTones[] = { NOTE_G4, NOTE_A4, NOTE_E4, NOTE_D4};
 
 // Complementary filter constants
 float alpha = 0.98;  // Filter constant (tune as needed)
@@ -56,7 +79,25 @@ void armESC() {
     motorFrontRight.write(500);
 }
 
+//calculate distance from duration readings of the radar sensors
+int calculateDistance(int trigPin, int echoPin){
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+  return (pulseIn(echoPin, HIGH) * 0.034/2);
+}
+
 void setup() {
+  // Attach ESCs to the appropriate pins
+  motorFrontLeft.attach(3);  // Pin 3 for front left motor
+  motorFrontRight.attach(5); // Pin 5 for front right motor
+  motorBackLeft.attach(6);   // Pin 6 for back left motor
+  motorBackRight.attach(9);  // Pin 9 for back right motor
+  //calibration and arming sequence is time sensitive
+  armESC();
+
   // Initialize and calibrate the MPU6050
   Wire.begin();
   while (!mpu.begin(MPU6050_SCALE_2000DPS, MPU6050_RANGE_2G)) {
@@ -66,13 +107,22 @@ void setup() {
 
   // Initialize BMP280
   bmp.begin();
-  // Attach ESCs to the appropriate pins
-  motorFrontLeft.attach(3);  // Pin 3 for front left motor
-  motorFrontRight.attach(5); // Pin 5 for front right motor
-  motorBackLeft.attach(6);   // Pin 6 for back left motor
-  motorBackRight.attach(9);  // Pin 9 for back right motor
-  armESC();
 
+  //setup IR
+  recieverIR.enableIRIn();
+
+  //setup radars output and input reading
+  pinMode(trigFront, OUTPUT);
+  pinMode(echoFront, INPUT);
+  digitalWrite(trigFront, LOW);
+
+  pinMode(trigBack, OUTPUT);
+  pinMode(echoBack, INPUT);
+  digitalWrite(trigBack, LOW);
+
+  //setup buzzer pin output reading
+  pinMode(BUZZER_PIN, OUTPUT);
+  
   /* Set initial motor speeds (idle speed for ESCs)
   motorFrontLeft.writeMicroseconds(minMotorSpeed);
   motorFrontRight.writeMicroseconds(minMotorSpeed);
