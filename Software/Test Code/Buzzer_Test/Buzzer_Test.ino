@@ -2,10 +2,17 @@
 
 #define BUZZER_PIN 8
 
-const int gameTones[] = { NOTE_G4, 
-                          NOTE_A4, 
-                          NOTE_E4, 
-                          NOTE_D4};
+const int gameTones[] = { NOTE_G5, 
+                          NOTE_FS5, 
+                          NOTE_B5, 
+                          NOTE_E5,
+                          NOTE_D5,
+                          NOTE_G5,
+                          NOTE_C4,
+                          NOTE_B4,
+                          NOTE_E5,
+                          NOTE_A4,
+                          NOTE_D5};
 
 void setup() {
   Serial.begin(9600);

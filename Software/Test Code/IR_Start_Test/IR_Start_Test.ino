@@ -57,11 +57,11 @@ void setup() {
 }
 
 int checkIRCode(int &IRCode){
-  if(receiverIR.decode()) {
-    Serial.println(receiverIR.decodedIRData.command);
-    IRCode = receiverIR.decodedIRData.command; //this will not return the integer. I do not have the USB to check how to recieve the integer from the given code.
+  if(recieverIR.decode()) {
+    Serial.println(recieverIR.decodedIRData.command);
+    IRCode = recieverIR.decodedIRData.command; //this will not return the integer. I do not have the USB to check how to recieve the integer from the given code.
     //P.S. I know where the USB is, it is on my desk. i will have it tomorrow, November 21st.
-    receiverIR.resume();
+    recieverIR.resume();
   }
 }
 
@@ -82,10 +82,10 @@ void loop() {
         //reset IRCode
         IRCode = 0;
         //detach motors
-        ESC1.detach();
-        ESC2.detach();
-        ESC3.detach();
-        ESC4.detach();
+        motorBackRight.detach();
+        motorFrontLeft.detach();
+        motorBackLeft.detach();
+        motorFrontRight.detach();
       }
     }
   }
