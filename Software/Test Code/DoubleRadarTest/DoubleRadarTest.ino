@@ -1,11 +1,11 @@
 // Double Radar Functionality
 #include <Servo.h>
 
-const unsigned int trigFront = 16;
-const unsigned int echoFront = 17;
+const unsigned int trigFront = 14;
+const unsigned int echoFront = 15;
 
-const unsigned int trigBack = 14;
-const unsigned int echoBack = 15;
+const unsigned int trigBack = 4;
+const unsigned int echoBack = 2;
 
 // Out of range is 13+ feet (23200 us pulse)
 const unsigned int MAX_DIST = 23200;

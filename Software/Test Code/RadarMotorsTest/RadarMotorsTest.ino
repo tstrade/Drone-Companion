@@ -20,14 +20,17 @@ Servo motorFrontLeft;
 Servo motorBackLeft;
 Servo motorFrontRight;
 
+float dist;
+float motorSpeed;
+
 //Initialize IR reciever in an IRrecv object
 IRrecv recieverIR(7);
 int IRCode  = 0;
 
 int i = 0;
 
-int minMotorSpeed = 1000;  // Minimum throttle
-int maxMotorSpeed = 2000;  // Maximum throttle
+int minMotorSpeed = 90;  // Minimum throttle
+int maxMotorSpeed = 180;  // Maximum throttle
 
 void armESC() {
     // Set high throttle
@@ -42,12 +45,12 @@ void armESC() {
     motorFrontLeft.write(minMotorSpeed);
     motorBackLeft.write(minMotorSpeed);
     motorFrontRight.write(minMotorSpeed);
-    delay(3000);   
+    delay(3000); 
     // Arm ESCs
-    motorBackRight.write(500);
-    motorFrontLeft.write(500);
-    motorBackLeft.write(500);
-    motorFrontRight.write(500);
+    motorBackRight.write(45);
+    motorFrontLeft.write(45);
+    motorBackLeft.write(45);
+    motorFrontRight.write(45);
     delay(1500);
 }
 
@@ -88,33 +91,35 @@ float calculateDistance(int trig, int echo) {
 }
 
 void loop() {
-  float dist;
-  int motorSpeed;
   checkIRCode();
   Serial.println(IRCode);
-  // Start motors
-  if (IRCode == 3) {
-    for (int i; i < 100; i++) {
-      backRadar.write(i);
-      dist = calculateDistance(trigBack, echoBack);
-      motorSpeed = map(motorSpeed, 0, 300, 50, 360);
-      Serial.print("New speed is: ");
-      Serial.println(motorSpeed);
-      motorBackRight.write(motorSpeed);
-      motorFrontLeft.write(motorSpeed);
-      motorBackLeft.write(motorSpeed);
-      motorFrontRight.write(motorSpeed);
-    }
-  // Stop motors
-  } else if (IRCode == 2){
+  backRadar.write(trigBack);
+  dist = calculateDistance(trigBack, echoBack);
+  Serial.print("User dist (cm) is: ");
+  Serial.println(dist);
+
+  if (IRCode == 3) { // Start motors
+    motorBackRight.write(0);
+    motorFrontLeft.write(0);
+    motorBackLeft.write(0);
+    motorFrontRight.write(0);
+  } else if (IRCode == 2){ // Stop motors
+    motorBackRight.write(100);
+    motorFrontLeft.write(100);
+    motorBackLeft.write(100);
+    motorFrontRight.write(100);
+  } else if (IRCode == 0) { // Motors based on radars
+    motorSpeed = map(dist, 0, 300, 50, 180);
+    Serial.print("New speed is: ");
+    Serial.println(motorSpeed);
+    motorBackRight.write(motorSpeed);
+    motorFrontLeft.write(motorSpeed);
+    motorBackLeft.write(motorSpeed);
+    motorFrontRight.write(motorSpeed);
+  } else { // Idle speed
     motorBackRight.write(50);
     motorFrontLeft.write(50);
     motorBackLeft.write(50);
     motorFrontRight.write(50);
-  } else {
-    motorBackRight.write(180);
-    motorFrontLeft.write(180);
-    motorBackLeft.write(180);
-    motorFrontRight.write(180);
   }
 }
