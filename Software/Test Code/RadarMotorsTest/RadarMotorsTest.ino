@@ -1,13 +1,20 @@
 #include <Servo.h>
 #include <IRremote.h>
 
-//define motor pins
+// motor pins
 #define BACKRIGHT 9
 #define FRONTLEFT 3
 #define BACKLEFT 6
 #define FRONTRIGHT 5
 
-// Define the servo motors (ESCs)
+// radar pins
+#define trigFront 14
+#define echoFront 15
+#define trigBack 4
+#define echoBack 2
+
+// Inititialize radars and motors in servo objects
+Servo frontRadar, backRadar;
 Servo motorBackRight;
 Servo motorFrontLeft;
 Servo motorBackLeft;
@@ -16,6 +23,8 @@ Servo motorFrontRight;
 //Initialize IR reciever in an IRrecv object
 IRrecv recieverIR(7);
 int IRCode  = 0;
+
+int i = 0;
 
 int minMotorSpeed = 1000;  // Minimum throttle
 int maxMotorSpeed = 2000;  // Maximum throttle
@@ -52,6 +61,12 @@ void setup() {
   armESC();
   //setup IR
   recieverIR.enableIRIn();
+  //setup radars pinout and input reading
+  pinMode(trigFront, OUTPUT);
+  pinMode(echoFront, INPUT);
+  pinMode(trigBack, OUTPUT);
+  pinMode(echoBack, INPUT);
+
   Serial.begin(9600);
 }
 
@@ -63,20 +78,43 @@ int checkIRCode(){
   return IRCode;
 }
 
-void loop() {
-  // Start motors
-  checkIRCode();
-  Serial.println(IRCode);
-  if (IRCode == 3) {
-    motorBackRight.write(minMotorSpeed);
-    motorFrontLeft.write(minMotorSpeed);
-    motorBackLeft.write(minMotorSpeed);
-    motorFrontRight.write(minMotorSpeed);
-  } else if (IRCode == 2){
-    motorBackRight.write(350);
-    motorFrontLeft.write(350);
-    motorBackLeft.write(350);
-    motorFrontRight.write(350);
-  }
+float calculateDistance(int trig, int echo) {
+  digitalWrite(trig, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trig, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trig, LOW);
+  return pulseIn(echo, HIGH) * 0.034/2;
 }
 
+void loop() {
+  float dist;
+  int motorSpeed;
+  checkIRCode();
+  Serial.println(IRCode);
+  // Start motors
+  if (IRCode == 3) {
+    for (int i; i < 100; i++) {
+      backRadar.write(i);
+      dist = calculateDistance(trigBack, echoBack);
+      motorSpeed = map(motorSpeed, 0, 300, 50, 360);
+      Serial.print("New speed is: ");
+      Serial.println(motorSpeed);
+      motorBackRight.write(motorSpeed);
+      motorFrontLeft.write(motorSpeed);
+      motorBackLeft.write(motorSpeed);
+      motorFrontRight.write(motorSpeed);
+    }
+  // Stop motors
+  } else if (IRCode == 2){
+    motorBackRight.write(50);
+    motorFrontLeft.write(50);
+    motorBackLeft.write(50);
+    motorFrontRight.write(50);
+  } else {
+    motorBackRight.write(180);
+    motorFrontLeft.write(180);
+    motorBackLeft.write(180);
+    motorFrontRight.write(180);
+  }
+}
