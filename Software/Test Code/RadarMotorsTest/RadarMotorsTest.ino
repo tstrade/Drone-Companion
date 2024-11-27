@@ -1,5 +1,10 @@
 #include <Servo.h>
 #include <IRremote.h>
+#include "pitches.h"
+
+// buzzer pin and tone
+#define BUZZER_PIN 8
+const int alert_tone = NOTE_FS5;
 
 // motor pins
 #define BACKRIGHT 9
@@ -20,8 +25,9 @@ Servo motorFrontLeft;
 Servo motorBackLeft;
 Servo motorFrontRight;
 
-float dist;
-float motorSpeed;
+int obstacleFlag = 0;
+float prevSpeed, motorSpeed, userDist;
+int speedFlag = 0;
 
 //Initialize IR reciever in an IRrecv object
 IRrecv recieverIR(7);
@@ -55,20 +61,26 @@ void armESC() {
 }
 
 void setup() {
-  // Attach ESCs to the appropriate pins
+  // Attach ESCs
   motorFrontLeft.attach(3);  // Pin 3 for front left motor
   motorFrontRight.attach(5); // Pin 5 for front right motor
   motorBackLeft.attach(6);   // Pin 6 for back left motor
   motorBackRight.attach(9);  // Pin 9 for back right motor
-  //calibration and arming sequence is time sensitive
+
+  // Calibration and Arming sequence
   armESC();
-  //setup IR
+
+  // Setup IR sensor
   recieverIR.enableIRIn();
-  //setup radars pinout and input reading
+
+  // Setup radars
   pinMode(trigFront, OUTPUT);
   pinMode(echoFront, INPUT);
   pinMode(trigBack, OUTPUT);
   pinMode(echoBack, INPUT);
+
+  // Setup buzzer
+  pinMode(BUZZER_PIN, OUTPUT);
 
   Serial.begin(9600);
 }
@@ -81,45 +93,82 @@ int checkIRCode(){
   return IRCode;
 }
 
-float calculateDistance(int trig, int echo) {
+float calculateDistance(int trig, int echo, int flag) {
   digitalWrite(trig, LOW);
   delayMicroseconds(2);
   digitalWrite(trig, HIGH);
   delayMicroseconds(10);
   digitalWrite(trig, LOW);
-  return pulseIn(echo, HIGH) * 0.034/2;
+  float dist = pulseIn(echo, HIGH) * 0.034/2;
+  if (trig == trigFront && flag && dist < 15.0) {
+    tone(BUZZER_PIN, alert_tone);
+    return dist;
+  } else {
+    return dist;
+  }
 }
 
 void loop() {
+  // Receive input from remote
   checkIRCode();
   Serial.println(IRCode);
-  backRadar.write(trigBack);
-  dist = calculateDistance(trigBack, echoBack);
-  Serial.print("User dist (cm) is: ");
-  Serial.println(dist);
 
-  if (IRCode == 3) { // Start motors
-    motorBackRight.write(0);
-    motorFrontLeft.write(0);
-    motorBackLeft.write(0);
-    motorFrontRight.write(0);
-  } else if (IRCode == 2){ // Stop motors
-    motorBackRight.write(100);
-    motorFrontLeft.write(100);
-    motorBackLeft.write(100);
-    motorFrontRight.write(100);
-  } else if (IRCode == 0) { // Motors based on radars
-    motorSpeed = map(dist, 0, 300, 50, 180);
-    Serial.print("New speed is: ");
-    Serial.println(motorSpeed);
-    motorBackRight.write(motorSpeed);
-    motorFrontLeft.write(motorSpeed);
-    motorBackLeft.write(motorSpeed);
-    motorFrontRight.write(motorSpeed);
-  } else { // Idle speed
-    motorBackRight.write(50);
-    motorFrontLeft.write(50);
-    motorBackLeft.write(50);
-    motorFrontRight.write(50);
+  // Check user distance to adjust motors
+  backRadar.write(trigBack);
+  userDist = calculateDistance(trigBack, echoBack, 0);
+  Serial.print("User dist (cm) is: ");
+  Serial.println(userDist);
+
+  // Setup reference speed
+  switch (speedFlag) {
+    case 0:
+      prevSpeed = map(userDist, 0, 300, 50, 180);
+      speedFlag = 1;
+      break;
+    default:
+      break;
+  }
+
+  // Detect obstacle distance to alert buzzer
+  frontRadar.write(trigFront);
+  int obstacleDist = calculateDistance(trigFront, echoFront, obstacleFlag);
+  Serial.print("Obstacle distance is: ");
+  Serial.println(obstacleDist);
+  if (obstacleFlag) { delay(250); }
+  noTone(BUZZER_PIN); 
+  
+  switch (IRCode) {
+    case 3: // Stop motors
+      obstacleFlag = 0;
+      motorBackRight.write(0);
+      motorFrontLeft.write(0);
+      motorBackLeft.write(0);
+      motorFrontRight.write(0);
+      break;
+    case 2: // Medium-high speed
+      obstacleFlag = 0;
+      motorBackRight.write(100);
+      motorFrontLeft.write(100);
+      motorBackLeft.write(100);
+      motorFrontRight.write(100);
+      break;
+    case 0: // Speed & buzzer based on radars
+      obstacleFlag = 1;
+      motorSpeed = (2 * map(userDist, 0, 300, 50, 180) + 3 * prevSpeed) / 5;
+      prevSpeed = motorSpeed;
+      Serial.print("New speed is: ");
+      Serial.println(motorSpeed);
+      motorBackRight.write(motorSpeed);
+      motorFrontLeft.write(motorSpeed);
+      motorBackLeft.write(motorSpeed);
+      motorFrontRight.write(motorSpeed);
+      break;
+    default: // Idle speed
+      obstacleFlag = 0;
+      motorBackRight.write(50);
+      motorFrontLeft.write(50);
+      motorBackLeft.write(50);
+      motorFrontRight.write(50);
+      break;
   }
 }
