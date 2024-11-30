@@ -26,6 +26,7 @@ float motorSpeed, userDist;
 //Initialize IR reciever in an IRrecv object
 IRrecv recieverIR(7);
 int IRCode  = 0;
+int results;
 
 int minMotorSpeed = 90;  // Minimum throttle
 int maxMotorSpeed = 180;  // Maximum throttle
@@ -61,22 +62,17 @@ void setup() {
   motorBackRight.attach(6);  // Pin 9 for back right motor
 
   // Calibration and Arming sequence
-  //armESC();
-  Serial.println("Plug in ESCs now - wait for confirmation beep");
+  armESC();
+  /*
   motorBackRight.write(minMotorSpeed);
   motorFrontLeft.write(minMotorSpeed);
   motorBackLeft.write(minMotorSpeed);
   motorFrontRight.write(minMotorSpeed);
-  delay(3000);
+  Serial.println("Plug in ESCs now - wait for confirmation beep");
   while (!Serial.available()) {}
   Serial.read();
-
-  motorBackRight.write(minMotorSpeed);
-  motorFrontLeft.write(minMotorSpeed);
-  motorBackLeft.write(minMotorSpeed);
-  motorFrontRight.write(minMotorSpeed);
-  delay(3000);
-
+  delay(1000);
+  */
   // Setup IR sensor
   recieverIR.enableIRIn();
 
@@ -93,8 +89,9 @@ void setup() {
 int checkIRCode(){
   if (recieverIR.decode()) { 
     IRCode = recieverIR.decodedIRData.command; 
+    delay(10);
+    recieverIR.resume();
   }
-  recieverIR.resume();
   return IRCode;
 }
 

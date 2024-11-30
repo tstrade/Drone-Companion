@@ -2,6 +2,7 @@
 #include <Servo.h>
 #include <MPU6050.h>
 
+// TEST DIFFERENT MOTOR SPEEDS (min = 90, max = 180)
 // Define the servo motors (ESCs)
 Servo motorBackRight;
 Servo motorFrontLeft;
@@ -133,6 +134,6 @@ void loop() {
 
   // Adjust motors
   adjustMotors(pitchCorrection, rollCorrection);
-h
+
   delay(10);
 }
