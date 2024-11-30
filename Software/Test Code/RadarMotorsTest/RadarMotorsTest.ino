@@ -6,12 +6,6 @@
 #define BUZZER_PIN 8
 const int alert_tone = NOTE_FS5;
 
-// motor pins
-#define BACKRIGHT 9
-#define FRONTLEFT 3
-#define BACKLEFT 6
-#define FRONTRIGHT 5
-
 // radar pins
 #define trigFront 14
 #define echoFront 15
@@ -26,14 +20,12 @@ Servo motorBackLeft;
 Servo motorFrontRight;
 
 int obstacleFlag = 0;
-float prevSpeed, motorSpeed, userDist;
-int speedFlag = 0;
+float prevSpeed = 0;
+float motorSpeed, userDist;
 
 //Initialize IR reciever in an IRrecv object
 IRrecv recieverIR(7);
 int IRCode  = 0;
-
-int i = 0;
 
 int minMotorSpeed = 90;  // Minimum throttle
 int maxMotorSpeed = 180;  // Maximum throttle
@@ -61,14 +53,29 @@ void armESC() {
 }
 
 void setup() {
+  Serial.begin(9600);
   // Attach ESCs
   motorFrontLeft.attach(3);  // Pin 3 for front left motor
-  motorFrontRight.attach(5); // Pin 5 for front right motor
-  motorBackLeft.attach(6);   // Pin 6 for back left motor
-  motorBackRight.attach(9);  // Pin 9 for back right motor
+  motorFrontRight.attach(9); // Pin 5 for front right motor
+  motorBackLeft.attach(5);   // Pin 6 for back left motor
+  motorBackRight.attach(6);  // Pin 9 for back right motor
 
   // Calibration and Arming sequence
-  armESC();
+  //armESC();
+  Serial.println("Plug in ESCs now - wait for confirmation beep");
+  motorBackRight.write(minMotorSpeed);
+  motorFrontLeft.write(minMotorSpeed);
+  motorBackLeft.write(minMotorSpeed);
+  motorFrontRight.write(minMotorSpeed);
+  delay(3000);
+  while (!Serial.available()) {}
+  Serial.read();
+
+  motorBackRight.write(minMotorSpeed);
+  motorFrontLeft.write(minMotorSpeed);
+  motorBackLeft.write(minMotorSpeed);
+  motorFrontRight.write(minMotorSpeed);
+  delay(3000);
 
   // Setup IR sensor
   recieverIR.enableIRIn();
@@ -81,8 +88,6 @@ void setup() {
 
   // Setup buzzer
   pinMode(BUZZER_PIN, OUTPUT);
-
-  Serial.begin(9600);
 }
 
 int checkIRCode(){
@@ -120,13 +125,8 @@ void loop() {
   Serial.println(userDist);
 
   // Setup reference speed
-  switch (speedFlag) {
-    case 0:
+  if (!prevSpeed) {
       prevSpeed = map(userDist, 0, 300, 50, 180);
-      speedFlag = 1;
-      break;
-    default:
-      break;
   }
 
   // Detect obstacle distance to alert buzzer
