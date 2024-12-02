@@ -4,124 +4,283 @@
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BMP280.h> 
 #include <IRremote.h>
-#include <pitches.h>
+#include "pitches.h"
 
-//define motor pins
+// Motor pins
 #define BACKRIGHT 9
 #define FRONTLEFT 3
 #define BACKLEFT 6
 #define FRONTRIGHT 5
 
-//define radar pins
+// Servo motors (ESCs)
+Servo FL, FR, BL, BR;
+int speeds[4];
+
+// Motor speed parameters
+const int minMotorSpeed = 1000, maxMotorSpeed = 2000;
+int targetMotorSpeed = 1700;
+int IN_FLIGHT = 0;
+
+// Radar pins
 #define trigFront 16
 #define echoFront 17
 #define trigBack 14
 #define echoBack 15
 
-//define buzzer pin
-#define BUZZER_PIN 8
-
-//define pi
-#define PI 3.14127
-
-// Define the servo motors (ESCs)
-Servo motorBackRight;
-Servo motorFrontLeft;
-Servo motorBackLeft;
-Servo motorFrontRight;
-
-// Create an instance of the MPU6050 object
-MPU6050 mpu;
-
-// Create an instance of the BMP280 object
-Adafruit_BMP280 bmp(10);
-
-//Initialize IR reciever in an IRrecv object
-IRrecv recieverIR(7);
-
-//define radar sensors using servo object
-Servo frontRadar;
-Servo backRadar;
-
-//define a list of tones the buzzer can produce
-const int gameTones[] = { NOTE_G4, NOTE_A4, NOTE_E4, NOTE_D4};
-
-// Initial motor speed (this will be modified later)
-int minMotorSpeed = 1000;  // Base motor speed (minimum throttle)
-int maxMotorSpeed = 2000;  // Maximum throttle for motors
-
-float altitudeThreshold = 5.0;
-
-const float stdAirPressure = 1013.25;
-
+// Radars
+Servo frontRadar, backRadar;
 const float preferredDistance = 100.0; // Preferred distance in cm
 const float distanceTolerance = 10.0; // Tolerance of +/- 10cm
 
-void armESC() {
-    // Set high throttle
-    delay(2000);
-    motorBackRight.write(maxMotorSpeed);
-    motorFrontLeft.write(maxMotorSpeed);
-    motorBackLeft.write(maxMotorSpeed);
-    motorFrontRight.write(maxMotorSpeed);
-    delay(5000);
-    // Set low throttle
-    motorBackRight.write(minMotorSpeed);
-    motorFrontLeft.write(minMotorSpeed);
-    motorBackLeft.write(minMotorSpeed);
-    motorFrontRight.write(minMotorSpeed);
-    delay(3000);   
-    // Arm ESCs
-    motorBackRight.write(500);
-    motorFrontLeft.write(500);
-    motorBackLeft.write(500);
-    motorFrontRight.write(500);
-}
+// Buzzer
+#define BUZZER_PIN 8
+const int alarm = NOTE_FS5;
+
+// MPU6050 instace
+MPU6050 mpu;
+
+// Gyro and accelerometer error offsets
+typedef struct {
+  float X, Y, Z;
+} Error;
+
+Error gyroError = {0, 0, 0}, accelError = {0, 0, 0};
+float previousPitch = 0.0, integralPitch = 0.0, PitchPID;
+float previousRoll = 0.0, integralRoll = 0.0, RollPID;
+float pitch = 0.0, roll = 0.0, yaw = 0.0;
+
+// BMP280 instance
+Adafruit_BMP280 bmp(10);
+float altitudeThreshold = 5.0;
+const float stdAirPressure = 1013.25;
+
+// IR receiver
+IRrecv receiverIR(7);
+volatile int IRCode = 0;
+
+// Time tracking
+unsigned long previousTime;
+
+// Function prototypes
+void applySpeeds(int speeds[]); // Motors
+void calibrateSensors(int samples); // MPU6050
+void computeAngles(float elapsedTime); // MPU6050
+void PIDControl(float elapsedTime); // Motors & MPU6050
+void adjustMotors(); // Motors
+int softClamp(int value, int min, int max); // Motors
+void checkIRCode(); // IR receiver
+int calculateDistance(int trigPin, int echoPin); // Radars
+void moveForwards(float updatedSpeed);
+void moveBackwards(float updatedSpeed);
+void follow();
+void takeOff();
+void land();
+void checkObstacle();
+void debugOutput(); 
 
 void setup() {
-  // Attach ESCs to the appropriate pins
-  motorFrontLeft.attach(3);  // Pin 3 for front left motor
-  motorFrontRight.attach(5); // Pin 5 for front right motor
-  motorBackLeft.attach(6);   // Pin 6 for back left motor
-  motorBackRight.attach(9);  // Pin 9 for back right motor
-  //calibration and arming sequence is time sensitive
-  armESC();
-
-  // Initialize and calibrate the MPU6050
+  Serial.begin(115200);
   Wire.begin();
-  while (!mpu.begin(MPU6050_SCALE_2000DPS, MPU6050_RANGE_2G)) {
+
+  // Setup IR sensor
+  receiverIR.enableIRIn();
+  Serial.println(F("IR Receiver initialized."));
+
+  /// Initialize and calibrate the MPU6050
+  Serial.println(F("Initializing MPU6050"));
+  while (!mpu.begin(MPU6050_SCALE_250DPS, MPU6050_RANGE_2G)) {
+    Serial.println(F("Failed to find MPU6050 chip, checking wiring!"));
     delay(500);
   }
-  mpu.calibrateGyro();
+  // Built-in calibration (not great)
+  mpu.calibrateGyro(1000);
+  mpu.setThreshold(3);
+  // Manual calibration to find offsets
+  calibrateSensors(500);
+  Serial.println(F("MPU6050 initialized and calibrated."));
 
   // Initialize BMP280
   bmp.begin();
-
-  //setup IR
-  recieverIR.enableIRIn();
+  Serial.println(F("BMP280 initialized."));
 
   //setup radars output and input reading
   pinMode(trigFront, OUTPUT);
   pinMode(echoFront, INPUT);
   digitalWrite(trigFront, LOW);
+  Serial.println(F("Front radar initialized."));
 
   pinMode(trigBack, OUTPUT);
   pinMode(echoBack, INPUT);
   digitalWrite(trigBack, LOW);
+  Serial.println(F("Back radar initialized."));
 
   //setup buzzer pin output reading
   pinMode(BUZZER_PIN, OUTPUT);
+  Serial.println(F("Buzzer initialized."));
   
-  /* Set initial motor speeds (idle speed for ESCs)
-  motorFrontLeft.writeMicroseconds(minMotorSpeed);
-  motorFrontRight.writeMicroseconds(minMotorSpeed);
-  motorBackLeft.writeMicroseconds(minMotorSpeed);
-  motorBackRight.writeMicroseconds(minMotorSpeed);
-  */
-  delay(2000);
+  for (int i = 0; i < 4; i++) {
+    speeds[i] = minMotorSpeed;
+  }
+
+  // Attach and arm ESCs
+  FL.attach(3); 
+  FR.attach(9);
+  BL.attach(5);
+  BR.attach(6);
+
+  applySpeeds(speeds);
+  Serial.println(F("Plug in the ESCs - wait for confirmation beeps"));
+  while (IRCode != 2) { checkIRCode(); }
+  Serial.println(F("Servo motors successfuly armed -- System Ready!\n"));
+
+  delay(1000);
+  previousTime = micros();
 }
 
-//calculate distance from duration readings of the radar sensors
+void loop() {
+  checkIRCode();
+  unsigned long currentTime = micros();
+  float elapsedTime;
+  // Sampling rate = 2000 Hz
+  if (currentTime - previousTime >= 500) {
+    switch(IRCode) {
+      case 1: // Just hover
+        elapsedTime = (currentTime - previousTime) / 1e6; // Convert to seconds
+        previousTime = currentTime;
+        // Compute angles and apply PID
+        computeAngles(elapsedTime);
+        PIDControl(elapsedTime);
+        // Adjust motors
+        adjustMotors();
+        break;
+      case 2: // Takeoff sequence
+        if (!IN_FLIGHT) { takeOff(); }
+        IRCode = 1;
+        break;
+      case 3: // Landing sequence
+        if (IN_FLIGHT) { land(); }
+        break;
+      default: // Follow the user
+        follow();
+        elapsedTime = (currentTime - previousTime) / 1e6; // Convert to seconds
+        previousTime = currentTime;
+        // Compute angles and apply PID
+        computeAngles(elapsedTime);
+        PIDControl(elapsedTime);
+        // Adjust motors
+        adjustMotors();
+        break;
+    }
+  }
+}
+
+void applySpeeds(int speeds[]) {
+  FL.writeMicroseconds(speeds[0]);
+  FR.writeMicroseconds(speeds[1]);
+  BL.writeMicroseconds(speeds[2]);
+  BR.writeMicroseconds(speeds[3]);
+}
+
+void calibrateSensors(int samples) {
+  Vector gyro, accel;
+
+  for (int i = 0; i < samples; i++) {
+    gyro = mpu.readNormalizeGyro();
+    accel = mpu.readNormalizeAccel();
+    
+    gyroError.X += gyro.XAxis;
+    gyroError.Y += gyro.YAxis;
+    gyroError.Z += gyro.ZAxis;
+    
+    accelError.X += accel.XAxis;
+    accelError.Y += accel.YAxis;
+    accelError.Z += accel.ZAxis;  
+
+    delay(1);
+  }
+  gyroError.X /= samples, gyroError.Y /= samples, gyroError.Z /= samples;
+  accelError.X /= samples, accelError.Y /= samples, accelError.Z /= samples;
+
+  Serial.println(F("Calibration complete. Verifying error..."));
+}
+
+void computeAngles(float elapsedTime) {
+  // Read and adjust gyroscope / accelerometer
+  Vector gyro = mpu.readNormalizeGyro();
+  gyro.XAxis -= gyroError.X, gyro.YAxis -= gyroError.Y, gyro.ZAxis -= gyroError.Z;
+  Serial.print(F("X: ")); Serial.print(gyro.XAxis); Serial.print(", ");
+  Serial.print(F("Y: ")); Serial.print(gyro.YAxis); Serial.print(", ");
+  Serial.print(F("Z: ")); Serial.print(gyro.ZAxis); Serial.print(", ");
+
+  Vector accel = mpu.readNormalizeAccel();
+  accel.XAxis -= accelError.X, accel.YAxis -= accelError.Y, accel.ZAxis -= accelError.Z;
+
+  // Calculate pitch and roll from gyroscope
+  float gyroPitch = pitch + gyro.YAxis * elapsedTime;
+  float gyroRoll = roll + gyro.XAxis * elapsedTime; 
+
+  float accRoll = (atan2(accel.YAxis, sqrt(pow(accel.XAxis, 2) + pow(accel.ZAxis, 2))) * 180 / PI) ;
+  float accPitch = (atan2(-1.0 * accel.XAxis, sqrt(pow(accel.YAxis, 2) + pow(accel.ZAxis, 2))) * 180 / PI); 
+
+  // Apply complementary filter of alpha = 95%
+  pitch = (pitch + 0.98 * gyroPitch + (0.02) * accPitch) / 2.0;
+  roll = (roll + 0.98 * gyroRoll + (0.02) * accRoll) / 2.0;
+
+  yaw += gyro.ZAxis * elapsedTime;
+}
+
+void PIDControl(float elapsedTime) {
+  // P = proportional gain -> magnitude of response to error
+  // I = integral control -> how fast error is removed (increase ki = decrease response time)
+  // D = derivate control -> how far in the future to predict rate of change
+  float kp = 1.01, ki = 0.6, kd = 0.00003; // PID constants
+
+  // u(t) = kp * e(t) + ki * integral_0^t e(x)dx + kd * d/dx * e(t)
+  PitchPID = kp * pitch + ki * (integralPitch += pitch * elapsedTime) + kd * (pitch - previousPitch) / elapsedTime;
+  previousPitch = pitch;
+  RollPID = kp * roll + ki * (integralRoll += pitch * elapsedTime) + kd * (pitch - previousPitch) / elapsedTime;
+  previousRoll = roll;
+}
+
+// Alternative to the abruptness of constrain()
+int softClamp(int value, int min, int max) {
+  if (value < min) return min + (value - min) / 6;
+  if (value > max) return max + (value - max) / 6;
+  return value;
+}
+
+void adjustMotors() {
+  // Scale corrections to keep adjustments moderate
+  float scale = 0.2;
+
+  // positive pitch -> back side needs to increase speed
+  // positive roll -> right side needs to increase speed
+  int targetSpeeds[4] = {
+    targetMotorSpeed + (-PitchPID - RollPID) * scale, // Front left
+    targetMotorSpeed + (-PitchPID + RollPID) * scale, // Front right
+    targetMotorSpeed + (PitchPID - RollPID) * scale, // Back left
+    targetMotorSpeed + (PitchPID + RollPID) * scale // Back right
+  };
+
+  // Calculate motor speed adjustments w/ soft clamping to smoothly enforce bounds
+  for (int i = 0; i < 4; i++) {
+    speeds[i] = softClamp(0.8 * speeds[i] + 0.2 * targetSpeeds[i], targetMotorSpeed - 30, targetMotorSpeed + 30);
+  }
+
+  // Write speeds to motors 
+  applySpeeds(speeds);
+
+  debugOutput();
+}
+
+void checkIRCode() {
+  if (receiverIR.decode()) { 
+    IRCode = receiverIR.decodedIRData.command; 
+    delay(10);
+    receiverIR.resume();
+  }
+}
+
 int calculateDistance(int trigPin, int echoPin){
   digitalWrite(trigPin, LOW);
   delayMicroseconds(2);
@@ -132,130 +291,119 @@ int calculateDistance(int trigPin, int echoPin){
 }
 
 void moveForwards(float updatedSpeed) {
-  motorBackLeft.write(updatedSpeed);
-  motorBackRight.write(updatedSpeed);
+  speeds[2] = updatedSpeed, speeds[3] = updatedSpeed;
+  applySpeeds(speeds);
 }
 
 void moveBackwards(float updatedSpeed) {
-  motorFrontLeft.write(updatedSpeed);
-  motorFrontRight.write(updatedSpeed);
+  speeds[0] = updatedSpeed, speeds[1] = updatedSpeed;
+  applySpeeds(speeds);
 }
 
-// Follow user function with the back radar
-void follow(float motorSpeed) {
+void follow() {
   float userDistance = calculateDistance(trigBack, echoBack);
-  float distanceDifference;
+  float distanceDifference, motorSpeed;
   
   // Move towards user gradually 
-  while(userDistance > preferredDistance){
+  if (userDistance > (preferredDistance - distanceTolerance)) {
     userDistance = calculateDistance(trigBack, echoBack);
     distanceDifference = userDistance - preferredDistance;
-
-    motorSpeed = map(distanceDifference, 0, preferredDistance, minMotorSpeed, maxMotorSpeed);  // Gradually increase speed
-    motorSpeed = constrain(motorSpeed, minMotorSpeed, maxMotorSpeed);  // Ensure speed is within bounds
-
+    motorSpeed = map(distanceDifference, 0, preferredDistance, targetMotorSpeed - 50, targetMotorSpeed + 50);
     moveBackwards(motorSpeed);
-    stabilizeDrone(motorSpeed);
-    delay(20);
   }
 
   // Move away from user gradually
-  while(userDistance < preferredDistance){
+  if (userDistance < (preferredDistance + distanceTolerance)) {
     userDistance = calculateDistance(trigBack, echoBack);
     distanceDifference = preferredDistance - userDistance;
-
     motorSpeed = map(distanceDifference, 0, preferredDistance, minMotorSpeed, maxMotorSpeed);  // Gradually increase speed
-    motorSpeed = constrain(motorSpeed, minMotorSpeed, maxMotorSpeed);  // Ensure speed is within bounds
-
     moveForwards(motorSpeed);
-    stabilizeDrone(motorSpeed);
-    delay(20);
   }
-  //!!add staalize function!!//
-  stabilizeDrone(minMotorSpeed + 500);
-  delay(100);
 }
 
-// Stabilize the drone's roll and pitch
-void stabilizeDrone(float motorSpeed) {
-    Vector ACCEL = mpu.readNormalizeAccel();
-    float ax = ACCEL.XAxis, ay = ACCEL.YAxis, az = ACCEL.ZAxis;
-    Vector GYRO = mpu.readNormalizeGyro();
-    float gx = GYRO.XAxis, gy = GYRO.YAxis;
+void takeOff() {
+  float tempTarget = targetMotorSpeed;
+  targetMotorSpeed = minMotorSpeed;
+  float alpha = 1.00; // complementary filter to smooth transition
+  float droneAltitude = bmp.readAltitude(stdAirPressure);
+  float targetAltitude = droneAltitude + 125.0; // centimeters
 
-    // Calculate angles
-    float roll = atan2(ay, az) * 180.0 / PI;
-    float pitch = atan2(-ax, sqrt(ay * ay + az * az)) * 180.0 / PI;
+  while (droneAltitude < targetAltitude) {
+    droneAltitude = bmp.readAltitude(stdAirPressure);
+    unsigned long currentTime = micros();
+    // Sampling rate = 2000 Hz
+    if (currentTime - previousTime >= 500) {
+      float elapsedTime = (currentTime - previousTime) / 1e6; // Convert to seconds
+      previousTime = currentTime;
+      
+      // Slowly increase speed
+      if (alpha > 0) {
+        alpha -= 0.01;
+        targetMotorSpeed = alpha * targetMotorSpeed + (1 - alpha) * tempTarget;
+       }
 
-    // Proportional control for roll and pitch stabilization
-    float rollCorrection = 0.1 * roll;
-    float pitchCorrection = 0.1 * pitch;
+      // Compute angles and apply PID
+      computeAngles(elapsedTime);
+      PIDControl(elapsedTime);
 
-    // Adjust motor speeds for stabilization
-    int speedFrontLeft = motorSpeed + rollCorrection - pitchCorrection;
-    int speedFrontRight = motorSpeed - rollCorrection - pitchCorrection;
-    int speedBackLeft = motorSpeed + rollCorrection + pitchCorrection;
-    int speedBackRight = motorSpeed - rollCorrection + pitchCorrection;
-
-    // Apply speed corrections within bounds
-    motorFrontLeft.writeMicroseconds(constrain(speedFrontLeft, minMotorSpeed, maxMotorSpeed));
-    motorFrontRight.writeMicroseconds(constrain(speedFrontRight, minMotorSpeed, maxMotorSpeed));
-    motorBackLeft.writeMicroseconds(constrain(speedBackLeft, minMotorSpeed, maxMotorSpeed));
-    motorBackRight.writeMicroseconds(constrain(speedBackRight, minMotorSpeed, maxMotorSpeed));
-}
-
-// Hover in place for a set time
-void hoverForTime(unsigned long duration, float motorSpeed) {
-    unsigned long startTime = millis();
-    while (millis() - startTime < duration) {
-        stabilizeDrone(motorSpeed);
-        delay(20);  // Adjust delay as needed for smoother control loop
+      // Adjust motors
+      adjustMotors();  
+      delayMicroseconds(100);  // Adjust delay for smoother takeoff
     }
-}
-
-// Takeoff sequence: gradually increase motor speeds
-void takeOff(float initialAltitude, float targetAltitude) {
-  int motorSpeed = minMotorSpeed;
-  float altitude = bmp.readAltitude(stdAirPressure);
-
-  while (altitude < initialAltitude + targetAltitude) {
-    altitude = bmp.readAltitude(stdAirPressure);  // Read current altitude
-
-    motorSpeed = map(altitude - initialAltitude, 0, targetAltitude, minMotorSpeed, maxMotorSpeed);  // Gradually increase speed
-    motorSpeed = constrain(motorSpeed, minMotorSpeed, maxMotorSpeed);  // Ensure speed is within bounds
-
-    // Apply motor speed and stabilization to ESCs
-    stabilizeDrone(motorSpeed);
-    
-    delay(50);  // Adjust delay for smoother takeoff
   }
+  targetMotorSpeed = tempTarget;
+  IN_FLIGHT = 1;
 }
 
-// Landing sequence: gradually decrease motor speeds
-void land(float initialAltitude) {
-  int motorSpeed = maxMotorSpeed;
-  float altitude;
+void land() {
+  while (targetMotorSpeed > minMotorSpeed) {
+    unsigned long currentTime = micros();
+    // Sampling rate = 2000 Hz
+    if (currentTime - previousTime >= 500) {
+      float elapsedTime = (currentTime - previousTime) / 1e6; // Convert to seconds
+      previousTime = currentTime;
 
-  while (bmp.readAltitude(stdAirPressure) > initialAltitude + 10) {
-    altitude = bmp.readAltitude(stdAirPressure);
-    motorSpeed = constrain(map(altitude - initialAltitude, 0, 50, maxMotorSpeed, minMotorSpeed), minMotorSpeed, maxMotorSpeed);
-       
-    stabilizeDrone(motorSpeed);
-    delay(50);
-  }
-}
+      // Compute angles and apply PID
+      computeAngles(elapsedTime);
+      PIDControl(elapsedTime);
 
-void loop() {
-  static float initialAltitude = bmp.readAltitude(stdAirPressure);
-  static float targetAltitude = 100.0;  // Target altitude (in centimeters -> appox. 3 ft.) 
-
-  if (recieverIR.decode()) {
-    if (recieverIR.decodedIRData.command == 3) {
-      takeOff(initialAltitude, targetAltitude);
-      hoverForTime(15000, minMotorSpeed + 500);
-    } else if (recieverIR.decodedIRData.command == 4) {
-      land(initialAltitude);
+      // Adjust motors
+      adjustMotors(); 
+      targetMotorSpeed = 240 * log(targetMotorSpeed);
+      delayMicroseconds(100);
     }
-    recieverIR.resume();
   }
+  int off[4] = {0,0,0,0};
+  applySpeeds(off);
+}
+
+void checkObstacle() {
+  backRadar.write(trigFront);
+  if (calculateDistance(trigFront, echoFront) < 20.0) {
+    receiverIR.stopTimer();
+    tone(BUZZER_PIN, alarm);
+    delay(200);
+    noTone(BUZZER_PIN);
+    receiverIR.restartTimer();
+  }
+}
+
+void debugOutput() {
+  // Log values for debugging
+  Serial.print(F("Pitch: ")); 
+  Serial.print(pitch); Serial.print(F(","));
+  Serial.print(F("   Roll: ")); 
+  Serial.print(roll); Serial.print(F(","));
+  Serial.print(F("   Yaw: ")); 
+  Serial.print(yaw); Serial.print(F(","));
+  
+  // Debugging: Print motor speeds
+  Serial.print(F("   FL: ")); 
+  Serial.print(speeds[0]); Serial.print(F(","));
+  Serial.print(F("   FR: ")); 
+  Serial.print(speeds[1]); Serial.print(F(","));
+  Serial.print(F("   BL: ")); 
+  Serial.print(speeds[2]); Serial.print(F(","));
+  Serial.print(F("   BR: "));
+  Serial.println(speeds[3]);
 }
