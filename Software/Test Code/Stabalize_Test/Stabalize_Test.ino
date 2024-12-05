@@ -8,11 +8,11 @@
 
 // Servo motors (ESCs)
 Servo FL, FR, BL, BR;
-int speeds[4];
+short int speeds[4];
 
 // Motor speed parameters
-const int minMotorSpeed = 1000, maxMotorSpeed = 2000;
-int targetMotorSpeed = 1700;
+const short int minMotorSpeed = 1000, maxMotorSpeed = 2000;
+short int targetMotorSpeed = 1700;
 short int IN_FLIGHT = 0;
 
 // Radar pins
@@ -23,8 +23,8 @@ short int IN_FLIGHT = 0;
 
 // Radars
 Servo frontRadar, backRadar;
-const float preferredDistance = 100.0; // Preferred distance in cm
-const float distanceTolerance = 10.0; // Tolerance of +/- 10cm
+const float preferredUserDistance = 60.0; // Preferred distance in cm
+const float userDistanceTolerance = 10.0; // Tolerance of +/- 10 cm
 
 // Buzzer
 #define BUZZER_PIN 8
@@ -154,7 +154,6 @@ void loop() {
         PIDControl(elapsedTime);
         // Adjust motors
         adjustMotors();
-        //checkObstacle();
         break;
       case 2: // Takeoff sequence
         if (!IN_FLIGHT) { takeOff(); }
@@ -316,16 +315,16 @@ void follow() {
   float distanceDifference, motorSpeed;
   
   // Move towards user gradually 
-  if (userDistance > (preferredDistance - distanceTolerance)) {
-    distanceDifference = userDistance - preferredDistance;
-    motorSpeed = map(distanceDifference, 0, preferredDistance, targetMotorSpeed - 50, targetMotorSpeed + 50);
+  if (userDistance > (preferredUserDistance - userDistanceTolerance)) {
+    distanceDifference = userDistance - preferredUserDistance;
+    motorSpeed = map(distanceDifference, 0, preferredUserDistance, targetMotorSpeed - 50, targetMotorSpeed + 50);
     moveBackwards(motorSpeed);
   }
 
   // Move away from user gradually
-  if (userDistance < (preferredDistance + distanceTolerance)) {
-    distanceDifference = preferredDistance - userDistance;
-    motorSpeed = map(distanceDifference, 0, preferredDistance, minMotorSpeed, maxMotorSpeed);  // Gradually increase speed
+  if (userDistance < (preferredUserDistance + userDistanceTolerance)) {
+    distanceDifference = preferredUserDistance - userDistance;
+    motorSpeed = map(distanceDifference, 0, preferredUserDistance, targetMotorSpeed - 50, targetMotorSpeed + 50);  // Gradually increase speed
     moveForwards(motorSpeed);
   }
 }
@@ -336,10 +335,13 @@ void takeOff() {
   targetMotorSpeed = minMotorSpeed;
   float alpha = 1.00; // complementary filter to smooth transition
   float droneAltitude = bmp.readAltitude(stdAirPressure);
-  float targetAltitude = droneAltitude + 125.0; // centimeters
-  int loopNum; // For test/demo purposes
-  while (droneAltitude < targetAltitude && loopNum++ < 50) {
+  float targetAltitude = droneAltitude + 100.0; // centimeters
+  //int loopNum; // For test/demo purposes
+  while (droneAltitude < targetAltitude) {
     droneAltitude = bmp.readAltitude(stdAirPressure);
+    Serial.print("Current relative altitude (cm): ");
+    Serial.println(targetAltitude - droneAltitude);
+    float takeoffFilter = map(targetAltitude - droneAltitude, 0.0, 115.0, 0, 1);
     unsigned long currentTime = micros();
     float elapsedTime;
     // Sampling rate = 2000 Hz
@@ -348,10 +350,7 @@ void takeOff() {
       previousTime = currentTime;
       
       // Slowly increase speed
-      if (alpha > 0) {
-        alpha -= 0.01;
-        targetMotorSpeed = alpha * targetMotorSpeed + (1 - alpha) * tempTarget;
-       }
+      targetMotorSpeed = takeoffFilter * targetMotorSpeed  + (1 - takeoffFilter) * tempTarget;
 
       // Compute angles and apply PID
       computeAngles(elapsedTime);
@@ -359,7 +358,7 @@ void takeOff() {
 
       // Adjust motors
       adjustMotors();  
-      delay(250);  // Adjust delay for smoother takeoff
+      //delay(200);  // Adjust delay for smoother takeoff
     }
   }
   targetMotorSpeed = tempTarget;
@@ -397,7 +396,7 @@ void checkObstacle() {
   frontRadar.write(trigFront);
   delayMicroseconds(500);
   int obstacleDist = calculateDistance(trigFront, echoFront);
-  if (obstacleDist < 20.0) {
+  if (obstacleDist < 11.11) {
     receiverIR.stopTimer();
     tone(BUZZER_PIN, alarm);
     delay(250);
