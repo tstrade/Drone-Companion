@@ -151,7 +151,6 @@ void loop() {
         PIDControl(elapsedTime);
         // Adjust motors
         adjustMotors();
-        //checkObstacle();
         break;
       case 2: // Takeoff sequence
         if (IN_FLIGHT == 0) { takeOff(); }
@@ -254,7 +253,7 @@ int softClamp(int value, int min, int max) {
 
 void adjustMotors() {
   // Scale corrections to keep adjustments moderate
-  float scale = 0.2;
+  float scale = 0.25;
 
   // positive pitch -> back side needs to increase speed
   // positive roll -> right side needs to increase speed
@@ -267,7 +266,7 @@ void adjustMotors() {
 
   // Calculate motor speed adjustments w/ soft clamping to smoothly enforce bounds
   for (int i = 0; i < 4; i++) {
-    speeds[i] = softClamp(0.8 * speeds[i] + 0.2 * targetSpeeds[i], targetMotorSpeed - 30, targetMotorSpeed + 30);
+    speeds[i] = softClamp(0.75 * speeds[i] + 0.25 * targetSpeeds[i], targetMotorSpeed - 30, targetMotorSpeed + 30);
   }
 
   // Write speeds to motors 
@@ -310,14 +309,14 @@ void follow() {
   float distanceDifference, motorSpeed;
   
   // Move towards user gradually 
-  if (userDistance > (preferredDistance - distanceTolerance)) {
+  if (userDistance > (preferredDistance + distanceTolerance)) {
     distanceDifference = userDistance - preferredDistance;
     motorSpeed = map(distanceDifference, 0, preferredDistance, targetMotorSpeed - 50, targetMotorSpeed + 50);
     moveBackwards(motorSpeed);
   }
 
   // Move away from user gradually
-  if (userDistance < (preferredDistance + distanceTolerance)) {
+  if (userDistance < (preferredDistance - distanceTolerance)) {
     distanceDifference = preferredDistance - userDistance;
     motorSpeed = map(distanceDifference, 0, preferredDistance, targetMotorSpeed - 50, targetMotorSpeed + 50);  // Gradually increase speed
     moveForwards(motorSpeed);
@@ -331,7 +330,7 @@ void takeOff() {
 
   float droneAltitude = bmp.readAltitude(stdAirPressure);
   float targetAltitude = droneAltitude + 1.0; // meters
-  int loopNum; // For test/demo purposes
+
   while (droneAltitude < targetAltitude) {
     droneAltitude = bmp.readAltitude(stdAirPressure);
     float alpha = map(targetAltitude - droneAltitude, -0.5, 1.5, 0, 1);
@@ -375,7 +374,7 @@ void land() {
       // Adjust motors
       adjustMotors(); 
       targetMotorSpeed -= 3;
-      delayMicroseconds(100);
+      delay(100);
     }
   }
   int off[4] = {0,0,0,0};
