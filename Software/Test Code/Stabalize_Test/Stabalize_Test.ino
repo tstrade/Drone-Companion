@@ -12,8 +12,8 @@ int speeds[4];
 
 // Motor speed parameters
 const int minMotorSpeed = 1000, maxMotorSpeed = 2000;
-int targetMotorSpeed = 1500;
-int IN_FLIGHT = 0;
+int targetMotorSpeed = 1700;
+short int IN_FLIGHT = 0;
 
 // Radar pins
 #define trigBack 4
@@ -50,14 +50,14 @@ const float stdAirPressure = 1013.25;
 
 // IR receiver
 IRrecv receiverIR(7);
-volatile int IRCode = 0;
+volatile short int IRCode = 0;
 
 // Time tracking
 unsigned long previousTime;
 
 // Debugging / print control
-//int DEBUG;
-int printFlag;
+short int DEBUG;
+unsigned short int printFlag = 0;
 
 // Function prototypes
 void applySpeeds(int speeds[]); // Motors
@@ -147,7 +147,8 @@ void loop() {
     previousTime = currentTime;
     switch(IRCode) {
       case 1: // Just hover
-        if (printFlag != 1) { Serial.println(F("Hovering...")); printFlag = 1; }
+        if (!IN_FLIGHT) { IRCode = 2; break; }
+        if (printFlag != 1) { Serial.println(F("Hovering...")); printFlag = 1; delay(10); }
         // Compute angles and apply PID
         computeAngles(elapsedTime);
         PIDControl(elapsedTime);
@@ -156,7 +157,7 @@ void loop() {
         //checkObstacle();
         break;
       case 2: // Takeoff sequence
-        if (IN_FLIGHT == 0) { takeOff(); }
+        if (!IN_FLIGHT) { takeOff(); }
         Serial.println(F("TAKEOFF SUCCESSFUL!"));
         IRCode = 1;
         break;
@@ -164,7 +165,8 @@ void loop() {
         if (IN_FLIGHT) { land(); Serial.println(F("LANDING SUCCESSFUL!")); }
         break;
       default: // Follow the user
-        if (printFlag != 0) { Serial.println(F("Following...")); printFlag = 0; }
+        if (!IN_FLIGHT) { IRCode = 2; break; }
+        if (printFlag == 1) { Serial.println(F("Following...")); printFlag = 0; }
         follow();
         // Compute angles and apply PID
         computeAngles(elapsedTime);
@@ -211,13 +213,13 @@ void computeAngles(float elapsedTime) {
   // Read and adjust gyroscope / accelerometer
   Vector gyro = mpu.readNormalizeGyro();
   gyro.XAxis -= gyroError.X, gyro.YAxis -= gyroError.Y, gyro.ZAxis -= gyroError.Z;
-  /*
+  ///*
   Serial.print("DEBUG #");
   Serial.print(++DEBUG);
   Serial.print(F(" X: ")); Serial.print(gyro.XAxis); Serial.print(", ");
   Serial.print(F("Y: ")); Serial.print(gyro.YAxis); Serial.print(", ");
   Serial.print(F("Z: ")); Serial.print(gyro.ZAxis); Serial.print(", ");
-  */
+  //*/
 
   Vector accel = mpu.readNormalizeAccel();
   accel.XAxis -= accelError.X, accel.YAxis -= accelError.Y, accel.ZAxis -= accelError.Z;
@@ -277,7 +279,7 @@ void adjustMotors() {
   // Write speeds to motors 
   applySpeeds(speeds);
 
-  //debugOutput();
+  debugOutput();
 }
 
 void checkIRCode() {
@@ -315,9 +317,6 @@ void follow() {
   
   // Move towards user gradually 
   if (userDistance > (preferredDistance - distanceTolerance)) {
-    backRadar.write(trigBack);
-    delayMicroseconds(500);
-    userDistance = calculateDistance(trigBack, echoBack);
     distanceDifference = userDistance - preferredDistance;
     motorSpeed = map(distanceDifference, 0, preferredDistance, targetMotorSpeed - 50, targetMotorSpeed + 50);
     moveBackwards(motorSpeed);
@@ -325,9 +324,6 @@ void follow() {
 
   // Move away from user gradually
   if (userDistance < (preferredDistance + distanceTolerance)) {
-    backRadar.write(trigBack);
-    delayMicroseconds(500);
-    userDistance = calculateDistance(trigBack, echoBack);
     distanceDifference = preferredDistance - userDistance;
     motorSpeed = map(distanceDifference, 0, preferredDistance, minMotorSpeed, maxMotorSpeed);  // Gradually increase speed
     moveForwards(motorSpeed);
@@ -363,7 +359,7 @@ void takeOff() {
 
       // Adjust motors
       adjustMotors();  
-      delay(500);  // Adjust delay for smoother takeoff
+      delay(250);  // Adjust delay for smoother takeoff
     }
   }
   targetMotorSpeed = tempTarget;
@@ -372,6 +368,7 @@ void takeOff() {
 
 void land() {
   Serial.print(F("Landing..."));
+  int tempTarget = targetMotorSpeed;
   while (targetMotorSpeed > minMotorSpeed) {
     unsigned long currentTime = micros();
     // Sampling rate = 2000 Hz
@@ -385,12 +382,15 @@ void land() {
 
       // Adjust motors
       adjustMotors(); 
-      targetMotorSpeed -= 1;
-      delay(500);
+      targetMotorSpeed -= 4;
+      delay(100);
     }
   }
+  delay(5000);
   int off[4] = {0,0,0,0};
   applySpeeds(off);
+  IN_FLIGHT = 0;
+  targetMotorSpeed = tempTarget;
 }
 
 void checkObstacle() {
