@@ -18,7 +18,7 @@ void loop() {
   // Collect altitude data
   Serial.print(F("Approx altitude = "));
   Serial.print(bmp.readAltitude(airPressure) - ground); 
-  Serial.println(" meters");
+  Serial.println(F(" meters"));
 
   Serial.println();
   delay(2000);

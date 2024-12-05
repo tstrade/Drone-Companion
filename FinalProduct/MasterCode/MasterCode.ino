@@ -1,6 +1,7 @@
 #include <Wire.h>
 #include <Servo.h>
 #include <MPU6050.h>
+#include <SPI.h>
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BMP280.h> 
 #include <IRremote.h>
@@ -12,7 +13,7 @@ int speeds[4];
 
 // Motor speed parameters
 const int minMotorSpeed = 1000, maxMotorSpeed = 2000;
-int targetMotorSpeed = 1500;
+int targetMotorSpeed = 1700;
 int IN_FLIGHT = 0;
 
 // Radar pins
@@ -23,7 +24,7 @@ int IN_FLIGHT = 0;
 
 // Radars
 Servo frontRadar, backRadar;
-const float preferredDistance = 100.0; // Preferred distance in cm
+const float preferredDistance = 60.0; // Preferred distance in cm
 const float distanceTolerance = 10.0; // Tolerance of +/- 10cm
 
 // Buzzer
@@ -310,9 +311,6 @@ void follow() {
   
   // Move towards user gradually 
   if (userDistance > (preferredDistance - distanceTolerance)) {
-    backRadar.write(trigBack);
-    delayMicroseconds(500);
-    userDistance = calculateDistance(trigBack, echoBack);
     distanceDifference = userDistance - preferredDistance;
     motorSpeed = map(distanceDifference, 0, preferredDistance, targetMotorSpeed - 50, targetMotorSpeed + 50);
     moveBackwards(motorSpeed);
@@ -320,26 +318,23 @@ void follow() {
 
   // Move away from user gradually
   if (userDistance < (preferredDistance + distanceTolerance)) {
-    backRadar.write(trigBack);
-    delayMicroseconds(500);
-    userDistance = calculateDistance(trigBack, echoBack);
     distanceDifference = preferredDistance - userDistance;
-    motorSpeed = map(distanceDifference, 0, preferredDistance, minMotorSpeed, maxMotorSpeed);  // Gradually increase speed
+    motorSpeed = map(distanceDifference, 0, preferredDistance, targetMotorSpeed - 50, targetMotorSpeed + 50);  // Gradually increase speed
     moveForwards(motorSpeed);
   }
 }
 
 void takeOff() {
   Serial.println(F("Taking off!"));
-  //receiverIR.stopTimer();
   float tempTarget = targetMotorSpeed;
   targetMotorSpeed = minMotorSpeed;
-  float alpha = 1.00; // complementary filter to smooth transition
+
   float droneAltitude = bmp.readAltitude(stdAirPressure);
-  float targetAltitude = droneAltitude + 125.0; // centimeters
+  float targetAltitude = droneAltitude + 1.0; // meters
   int loopNum; // For test/demo purposes
-  while (droneAltitude < targetAltitude && loopNum++ < 50) {
+  while (droneAltitude < targetAltitude) {
     droneAltitude = bmp.readAltitude(stdAirPressure);
+    float alpha = map(targetAltitude - droneAltitude, -0.5, 1.5, 0, 1);
     unsigned long currentTime = micros();
     float elapsedTime;
     // Sampling rate = 2000 Hz
@@ -348,10 +343,7 @@ void takeOff() {
       previousTime = currentTime;
       
       // Slowly increase speed
-      if (alpha > 0) {
-        alpha -= 0.01;
-        targetMotorSpeed = alpha * targetMotorSpeed + (1 - alpha) * tempTarget;
-       }
+      targetMotorSpeed = alpha * targetMotorSpeed + (1 - alpha) * tempTarget;
 
       // Compute angles and apply PID
       computeAngles(elapsedTime);
@@ -364,14 +356,12 @@ void takeOff() {
   }
   targetMotorSpeed = tempTarget;
   IN_FLIGHT = 1;
-  //receiverIR.restartTimer();
-  //delayMicroseconds(100);
-  //receiverIR.resume();
 }
 
 void land() {
+  int tempTarget = targetMotorSpeed;
+  Serial.print(F("Landing..."));
   while (targetMotorSpeed > minMotorSpeed) {
-    Serial.print(F("Landing..."));
     unsigned long currentTime = micros();
     // Sampling rate = 2000 Hz
     if (currentTime - previousTime >= 500) {
@@ -384,20 +374,21 @@ void land() {
 
       // Adjust motors
       adjustMotors(); 
-      targetMotorSpeed -= 10;
-      Serial.println(targetMotorSpeed);
+      targetMotorSpeed -= 3;
       delayMicroseconds(100);
     }
   }
   int off[4] = {0,0,0,0};
   applySpeeds(off);
+  IN_FLIGHT = 0;
+  targetMotorSpeed = tempTarget;
 }
 
 void checkObstacle() {
   frontRadar.write(trigFront);
   delayMicroseconds(500);
   int obstacleDist = calculateDistance(trigFront, echoFront);
-  if (obstacleDist < 20.0) {
+  if (obstacleDist < 11.11) {
     receiverIR.stopTimer();
     tone(BUZZER_PIN, alarm);
     delay(250);
