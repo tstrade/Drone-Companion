@@ -6,26 +6,20 @@
 #include <IRremote.h>
 #include "pitches.h"
 
-// Motor pins
-#define BACKRIGHT 9
-#define FRONTLEFT 3
-#define BACKLEFT 6
-#define FRONTRIGHT 5
-
 // Servo motors (ESCs)
 Servo FL, FR, BL, BR;
 int speeds[4];
 
 // Motor speed parameters
 const int minMotorSpeed = 1000, maxMotorSpeed = 2000;
-int targetMotorSpeed = 1700;
+int targetMotorSpeed = 1500;
 int IN_FLIGHT = 0;
 
 // Radar pins
-#define trigFront 16
-#define echoFront 17
-#define trigBack 14
-#define echoBack 15
+#define trigBack 4
+#define echoBack 2
+#define trigFront 14
+#define echoFront 15
 
 // Radars
 Servo frontRadar, backRadar;
@@ -61,6 +55,9 @@ volatile int IRCode = 0;
 // Time tracking
 unsigned long previousTime;
 
+// Debugging count
+int DEBUG;
+
 // Function prototypes
 void applySpeeds(int speeds[]); // Motors
 void calibrateSensors(int samples); // MPU6050
@@ -82,6 +79,21 @@ void setup() {
   Serial.begin(115200);
   Wire.begin();
 
+  // Initialize BMP280
+  bmp.begin();
+  Serial.println(F("BMP280 initialized."));
+
+  //setup radars output and input reading
+  pinMode(trigFront, OUTPUT);
+  pinMode(echoFront, INPUT);
+  digitalWrite(trigFront, LOW);
+  Serial.println(F("Front radar initialized."));
+
+  pinMode(trigBack, OUTPUT);
+  pinMode(echoBack, INPUT);
+  digitalWrite(trigBack, LOW);
+  Serial.println(F("Back radar initialized."));
+
   // Setup IR sensor
   receiverIR.enableIRIn();
   Serial.println(F("IR Receiver initialized."));
@@ -98,21 +110,6 @@ void setup() {
   // Manual calibration to find offsets
   calibrateSensors(500);
   Serial.println(F("MPU6050 initialized and calibrated."));
-
-  // Initialize BMP280
-  bmp.begin();
-  Serial.println(F("BMP280 initialized."));
-
-  //setup radars output and input reading
-  pinMode(trigFront, OUTPUT);
-  pinMode(echoFront, INPUT);
-  digitalWrite(trigFront, LOW);
-  Serial.println(F("Front radar initialized."));
-
-  pinMode(trigBack, OUTPUT);
-  pinMode(echoBack, INPUT);
-  digitalWrite(trigBack, LOW);
-  Serial.println(F("Back radar initialized."));
 
   //setup buzzer pin output reading
   pinMode(BUZZER_PIN, OUTPUT);
@@ -143,32 +140,35 @@ void loop() {
   float elapsedTime;
   // Sampling rate = 2000 Hz
   if (currentTime - previousTime >= 500) {
+    elapsedTime = (currentTime - previousTime) / 1e6; // Convert to seconds
+    previousTime = currentTime;
     switch(IRCode) {
       case 1: // Just hover
-        elapsedTime = (currentTime - previousTime) / 1e6; // Convert to seconds
-        previousTime = currentTime;
+        Serial.println(F("Hovering..."));
         // Compute angles and apply PID
         computeAngles(elapsedTime);
         PIDControl(elapsedTime);
         // Adjust motors
         adjustMotors();
+        //checkObstacle();
         break;
       case 2: // Takeoff sequence
-        if (!IN_FLIGHT) { takeOff(); }
+        if (IN_FLIGHT == 0) { takeOff(); }
+        Serial.println(F("TAKEOFF SUCCESSFUL!"));
         IRCode = 1;
         break;
       case 3: // Landing sequence
-        if (IN_FLIGHT) { land(); }
+        if (IN_FLIGHT) { land(); Serial.println(F("LANDING SUCCESSFUL!")); }
         break;
       default: // Follow the user
+        Serial.println(F("Following..."));
         follow();
-        elapsedTime = (currentTime - previousTime) / 1e6; // Convert to seconds
-        previousTime = currentTime;
         // Compute angles and apply PID
         computeAngles(elapsedTime);
         PIDControl(elapsedTime);
         // Adjust motors
         adjustMotors();
+        checkObstacle();
         break;
     }
   }
@@ -208,7 +208,9 @@ void computeAngles(float elapsedTime) {
   // Read and adjust gyroscope / accelerometer
   Vector gyro = mpu.readNormalizeGyro();
   gyro.XAxis -= gyroError.X, gyro.YAxis -= gyroError.Y, gyro.ZAxis -= gyroError.Z;
-  Serial.print(F("X: ")); Serial.print(gyro.XAxis); Serial.print(", ");
+  Serial.print("DEBUG #");
+  Serial.print(++DEBUG);
+  Serial.print(F(" X: ")); Serial.print(gyro.XAxis); Serial.print(", ");
   Serial.print(F("Y: ")); Serial.print(gyro.YAxis); Serial.print(", ");
   Serial.print(F("Z: ")); Serial.print(gyro.ZAxis); Serial.print(", ");
 
@@ -222,7 +224,7 @@ void computeAngles(float elapsedTime) {
   float accRoll = (atan2(accel.YAxis, sqrt(pow(accel.XAxis, 2) + pow(accel.ZAxis, 2))) * 180 / PI) ;
   float accPitch = (atan2(-1.0 * accel.XAxis, sqrt(pow(accel.YAxis, 2) + pow(accel.ZAxis, 2))) * 180 / PI); 
 
-  // Apply complementary filter of alpha = 95%
+  // Apply complementary filter of alpha = 98%
   pitch = (pitch + 0.98 * gyroPitch + (0.02) * accPitch) / 2.0;
   roll = (roll + 0.98 * gyroRoll + (0.02) * accRoll) / 2.0;
 
@@ -276,7 +278,7 @@ void adjustMotors() {
 void checkIRCode() {
   if (receiverIR.decode()) { 
     IRCode = receiverIR.decodedIRData.command; 
-    delay(10);
+    delayMicroseconds(10);
     receiverIR.resume();
   }
 }
@@ -301,11 +303,15 @@ void moveBackwards(float updatedSpeed) {
 }
 
 void follow() {
+  backRadar.write(trigBack);
+  delayMicroseconds(500);
   float userDistance = calculateDistance(trigBack, echoBack);
   float distanceDifference, motorSpeed;
   
   // Move towards user gradually 
   if (userDistance > (preferredDistance - distanceTolerance)) {
+    backRadar.write(trigBack);
+    delayMicroseconds(500);
     userDistance = calculateDistance(trigBack, echoBack);
     distanceDifference = userDistance - preferredDistance;
     motorSpeed = map(distanceDifference, 0, preferredDistance, targetMotorSpeed - 50, targetMotorSpeed + 50);
@@ -314,6 +320,8 @@ void follow() {
 
   // Move away from user gradually
   if (userDistance < (preferredDistance + distanceTolerance)) {
+    backRadar.write(trigBack);
+    delayMicroseconds(500);
     userDistance = calculateDistance(trigBack, echoBack);
     distanceDifference = preferredDistance - userDistance;
     motorSpeed = map(distanceDifference, 0, preferredDistance, minMotorSpeed, maxMotorSpeed);  // Gradually increase speed
@@ -322,18 +330,21 @@ void follow() {
 }
 
 void takeOff() {
+  Serial.println(F("Taking off!"));
+  //receiverIR.stopTimer();
   float tempTarget = targetMotorSpeed;
   targetMotorSpeed = minMotorSpeed;
   float alpha = 1.00; // complementary filter to smooth transition
   float droneAltitude = bmp.readAltitude(stdAirPressure);
   float targetAltitude = droneAltitude + 125.0; // centimeters
-
-  while (droneAltitude < targetAltitude) {
+  int loopNum; // For test/demo purposes
+  while (droneAltitude < targetAltitude && loopNum++ < 50) {
     droneAltitude = bmp.readAltitude(stdAirPressure);
     unsigned long currentTime = micros();
+    float elapsedTime;
     // Sampling rate = 2000 Hz
     if (currentTime - previousTime >= 500) {
-      float elapsedTime = (currentTime - previousTime) / 1e6; // Convert to seconds
+      elapsedTime = (currentTime - previousTime) / 1e6; // Convert to seconds
       previousTime = currentTime;
       
       // Slowly increase speed
@@ -353,10 +364,14 @@ void takeOff() {
   }
   targetMotorSpeed = tempTarget;
   IN_FLIGHT = 1;
+  //receiverIR.restartTimer();
+  //delayMicroseconds(100);
+  //receiverIR.resume();
 }
 
 void land() {
   while (targetMotorSpeed > minMotorSpeed) {
+    Serial.print(F("Landing..."));
     unsigned long currentTime = micros();
     // Sampling rate = 2000 Hz
     if (currentTime - previousTime >= 500) {
@@ -369,7 +384,8 @@ void land() {
 
       // Adjust motors
       adjustMotors(); 
-      targetMotorSpeed = 240 * log(targetMotorSpeed);
+      targetMotorSpeed -= 10;
+      Serial.println(targetMotorSpeed);
       delayMicroseconds(100);
     }
   }
@@ -378,13 +394,16 @@ void land() {
 }
 
 void checkObstacle() {
-  backRadar.write(trigFront);
-  if (calculateDistance(trigFront, echoFront) < 20.0) {
+  frontRadar.write(trigFront);
+  delayMicroseconds(500);
+  int obstacleDist = calculateDistance(trigFront, echoFront);
+  if (obstacleDist < 20.0) {
     receiverIR.stopTimer();
     tone(BUZZER_PIN, alarm);
-    delay(200);
+    delay(250);
     noTone(BUZZER_PIN);
     receiverIR.restartTimer();
+    delayMicroseconds(100);
   }
 }
 
@@ -397,7 +416,6 @@ void debugOutput() {
   Serial.print(F("   Yaw: ")); 
   Serial.print(yaw); Serial.print(F(","));
   
-  // Debugging: Print motor speeds
   Serial.print(F("   FL: ")); 
   Serial.print(speeds[0]); Serial.print(F(","));
   Serial.print(F("   FR: ")); 
