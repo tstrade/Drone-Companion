@@ -174,14 +174,19 @@ void loop() {
   }
 }
 
-void applySpeeds(int speeds[]) {
+
+/******************************************************/
+void 
+applySpeeds(int speeds[]) {
   FL.writeMicroseconds(speeds[0]);
   FR.writeMicroseconds(speeds[1]);
   BL.writeMicroseconds(speeds[2]);
   BR.writeMicroseconds(speeds[3]);
 }
 
-void calibrateSensors(int samples) {
+
+void 
+calibrateSensors(int samples) {
   Vector gyro, accel;
 
   for (int i = 0; i < samples; i++) {
@@ -204,7 +209,9 @@ void calibrateSensors(int samples) {
   Serial.println(F("Calibration complete. Verifying error..."));
 }
 
-void computeAngles(float elapsedTime) {
+
+void 
+computeAngles(float elapsedTime) {
   // Read and adjust gyroscope / accelerometer
   Vector gyro = mpu.readNormalizeGyro();
   gyro.XAxis -= gyroError.X, gyro.YAxis -= gyroError.Y, gyro.ZAxis -= gyroError.Z;
@@ -231,7 +238,9 @@ void computeAngles(float elapsedTime) {
   yaw += gyro.ZAxis * elapsedTime;
 }
 
-void PIDControl(float elapsedTime) {
+
+void 
+PIDControl(float elapsedTime) {
   // P = proportional gain -> magnitude of response to error
   // I = integral control -> how fast error is removed (increase ki = decrease response time)
   // D = derivate control -> how far in the future to predict rate of change
@@ -244,14 +253,18 @@ void PIDControl(float elapsedTime) {
   previousRoll = roll;
 }
 
+
 // Alternative to the abruptness of constrain()
-int softClamp(int value, int min, int max) {
+int 
+softClamp(int value, int min, int max) {
   if (value < min) return min + (value - min) / 6;
   if (value > max) return max + (value - max) / 6;
   return value;
 }
 
-void adjustMotors() {
+
+void 
+adjustMotors() {
   // Scale corrections to keep adjustments moderate
   float scale = 0.25;
 
@@ -275,7 +288,9 @@ void adjustMotors() {
   debugOutput();
 }
 
-void checkIRCode() {
+
+void 
+checkIRCode() {
   if (receiverIR.decode()) { 
     IRCode = receiverIR.decodedIRData.command; 
     delayMicroseconds(10);
@@ -283,7 +298,9 @@ void checkIRCode() {
   }
 }
 
-int calculateDistance(int trigPin, int echoPin){
+
+int 
+calculateDistance(int trigPin, int echoPin){
   digitalWrite(trigPin, LOW);
   delayMicroseconds(2);
   digitalWrite(trigPin, HIGH);
@@ -292,17 +309,23 @@ int calculateDistance(int trigPin, int echoPin){
   return (pulseIn(echoPin, HIGH) * 0.034/2);
 }
 
-void moveForwards(float updatedSpeed) {
+
+void 
+moveForwards(float updatedSpeed) {
   speeds[2] = updatedSpeed, speeds[3] = updatedSpeed;
   applySpeeds(speeds);
 }
 
-void moveBackwards(float updatedSpeed) {
+
+void 
+moveBackwards(float updatedSpeed) {
   speeds[0] = updatedSpeed, speeds[1] = updatedSpeed;
   applySpeeds(speeds);
 }
 
-void follow() {
+
+void 
+follow() {
   backRadar.write(trigBack);
   delayMicroseconds(500);
   float userDistance = calculateDistance(trigBack, echoBack);
@@ -323,7 +346,9 @@ void follow() {
   }
 }
 
-void takeOff() {
+
+void 
+takeOff() {
   Serial.println(F("Taking off!"));
   float tempTarget = targetMotorSpeed;
   targetMotorSpeed = minMotorSpeed;
@@ -357,7 +382,9 @@ void takeOff() {
   IN_FLIGHT = 1;
 }
 
-void land() {
+
+void 
+land() {
   int tempTarget = targetMotorSpeed;
   Serial.print(F("Landing..."));
   while (targetMotorSpeed > minMotorSpeed) {
@@ -383,7 +410,9 @@ void land() {
   targetMotorSpeed = tempTarget;
 }
 
-void checkObstacle() {
+
+void 
+checkObstacle() {
   frontRadar.write(trigFront);
   delayMicroseconds(500);
   int obstacleDist = calculateDistance(trigFront, echoFront);
@@ -397,7 +426,9 @@ void checkObstacle() {
   }
 }
 
-void debugOutput() {
+
+void 
+debugOutput() {
   // Log values for debugging
   Serial.print(F("Pitch: ")); 
   Serial.print(pitch); Serial.print(F(","));
